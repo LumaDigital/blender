@@ -13,15 +13,17 @@ bl_info = {
     "category": "Animation",
 }
 
-from . import gui
+from . import gui, operators
 
 import bpy
 
 def register():
 
     gui.register()
+    operators.register()
 
 def unregister():
 
     gui.unregister()
+    operators.unregister()
 
