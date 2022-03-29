@@ -13,13 +13,15 @@ bl_info = {
     "category": "Animation",
 }
 
+from . import gui
+
 import bpy
 
 def register():
-    print("Hello World")
+
+    gui.register()
 
 def unregister():
-    print("Goodbye World")
 
-if __name__ == "__main__":
-    register()
+    gui.unregister()
+
