@@ -31,8 +31,7 @@ class VIEW3D_PT_animation_library(animation_library_panel, Panel):
         window_manager = context.window_manager
 
         row = layout.row()
-        row.label(text = "Animation Frame Range:")
-        row = layout.row()
+        row.label(text="Animation Frame Range:")
         row.prop(window_manager, "animlib_frame_range")
         row = layout.row()
         row.operator("animlib.create_animation_asset")
@@ -44,17 +43,6 @@ classes = (
 # Convenient utils method that loops through the list of classes and un/registers them accordingly
 _register_classes, _unregister_classes = bpy.utils.register_classes_factory(classes)
 
-def assign_control_variables():
-
-    #bpy.types.WindowManager.animlib_frame_start  = ( 
-    #    bpy.props.IntProperty(name = "Start Frame: ", min=1, default=1))
-    #bpy.types.WindowManager.animlib_frame_end  = ( 
-    #    bpy.props.IntProperty(name = "End Frame: "))
-
-    bpy.types.WindowManager.animlib_frame_range = (
-        bpy.props.IntVectorProperty(name = "", min = 1, size = 2, default = (1, 1)))
-
-
 def register() -> None:
 
     assign_control_variables()
@@ -63,3 +51,8 @@ def register() -> None:
 def unregister() -> None:
 
     _unregister_classes()
+
+def assign_control_variables():
+
+    bpy.types.WindowManager.animlib_frame_range = (
+        bpy.props.IntVectorProperty(name = "", min = 1, size = 2, default = (1, 1)))
