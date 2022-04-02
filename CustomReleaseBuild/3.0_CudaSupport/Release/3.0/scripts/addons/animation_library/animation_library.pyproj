@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>{7f4f6b05-e63a-4283-a6e9-1695a8d892f8}</ProjectGuid>
+    <ProjectGuid>{0bf057a6-225c-40d0-b651-cc9aa0740150}</ProjectGuid>
     <ProjectHome />
     <StartupFile>__init__.py</StartupFile>
     <SearchPath />
@@ -19,6 +19,9 @@
     <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="animation_creation.py" />
+    <Compile Include="gui.py" />
+    <Compile Include="operators.py" />
     <Compile Include="__init__.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />

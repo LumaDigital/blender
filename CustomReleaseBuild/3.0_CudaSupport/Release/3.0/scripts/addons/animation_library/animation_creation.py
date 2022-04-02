@@ -3,7 +3,8 @@ from bpy.types import (
     Action,
     Context,
     FCurve,
-    Keyframe)
+    Keyframe,
+    Operator)
 
 from typing import Optional#, FrozenSet, Set, Union, Iterable, cast
 
@@ -11,6 +12,7 @@ import dataclasses
 
 @dataclasses.dataclass(unsafe_hash=True, frozen=True)
 class AnimationCreationParameters:
+    OT_source_operator: Operator
     context_object: bpy.types.Object
     action: Optional[Action]
     start_frame: float
@@ -29,17 +31,21 @@ class AnimationActionCreator:
         new_action = self._create_new_action()
         self._store_animation(new_action)
 
-        #if len(dst_action.fcurves) == 0:
-        #    bpy.data.actions.remove(new_action)
-        #    return None
-
         return new_action
 
     def _create_new_action(self) -> Action:
         """test"""
-        #dst_action = bpy.data.actions.new(self.parameters.asset_name)
-        print ("dst_action_frame_range: " + str(dst_action.frame_range))
-        #print ("frame_range: " + str(self.parameters.action.frame_range[1]))
+
+        if self.parameters.action  != None:
+            if len(self.parameters.action.fcurves[0].keyframe_points) <= 1:
+                self.parameters.OT_source_operator.report(
+                    {"INFO"},
+                    "Final frame not present, a dummy frame will be added")
+
+        else:
+            self.parameters.OT_source_operator.report(
+                {"INFO"},
+                "No keyframes present, dummy keyframes will be added")
 
         return print("_create_new_action")
 
@@ -49,6 +55,7 @@ class AnimationActionCreator:
 
 
 def create_animation_asset(
+    OT_source_operator: Operator,
     context: Context,
     asset_name: str,
     start_frame: int,
@@ -56,6 +63,7 @@ def create_animation_asset(
     """Test test"""
 
     parameters = AnimationCreationParameters(
+        OT_source_operator,
         context.object,
         getattr(context.object.animation_data, "action", None),
         start_frame,
@@ -65,4 +73,4 @@ def create_animation_asset(
     animation_creator = AnimationActionCreator(parameters)
     animation_action =  animation_creator.create()
 
-    return "lol"
+    return animation_action

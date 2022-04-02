@@ -51,6 +51,7 @@ class ANIMLIB_OT_create_animation_asset(Operator):
         end_frame = self.end_frame or context.window_manager.animlib_frame_range[1]
 
         animation_asset = animation_creation.create_animation_asset(
+            self,
             context,
             animation_name,
             start_frame,
