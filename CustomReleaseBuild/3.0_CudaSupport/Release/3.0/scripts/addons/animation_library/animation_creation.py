@@ -48,7 +48,17 @@ class AnimationActionCreator:
                     current_action.fcurves[0].keyframe_points[0].co[0] + self.DUMMY_FRAMES_DISTANCE, # x value of keyframe coordinates + distance
                     0)
 
-            new_action = current_action.copy()
+                new_action = current_action.copy()
+            else:
+                new_action = current_action.copy()#temp
+                print("\n\n\n\n\n\n\n")
+                for frame_curve in current_action.fcurves:
+                    print("\n======\n" + str(frame_curve) + "\n")
+                    for x in range(self.parameters.start_frame, self.parameters.end_frame + 1):
+                        for keyframe in frame_curve.keyframe_points:
+                            if keyframe.co[0] == x:
+                                print(str(keyframe.co[0]))
+                    print("\n======\n")
 
             # Attach action to force the timeline to update with the new key
             self.parameters.context_object.animation_data.action = new_action
