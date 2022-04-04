@@ -14,7 +14,7 @@ import dataclasses
 class AnimationCreationParameters:
     OT_source_operator: Operator
     context_object: bpy.types.Object
-    action: Optional[Action]
+    current_action: Optional[Action]
     start_frame: float
     end_frame: float
     asset_name: str
@@ -29,36 +29,35 @@ class AnimationActionCreator:
 
     parameters: AnimationCreationParameters
 
-    def create(self) -> Optional[Action]:
+    def create_animation_action(self) -> Action:
         """test"""
 
-        new_action = self._create_new_action()
-        self._store_animation(new_action)
+        new_action = bpy.data.actions.new(self.parameters.asset_name)
+        current_action = self.parameters.current_action
+        if current_action != None:
 
-        return new_action
-
-    def _create_new_action(self) -> Action:
-        """test"""
-
-        new_action = None
-        if self.parameters.action  != None:
-
-            new_action = self.parameters.action
-            if len(new_action.fcurves[0].keyframe_points) <= 1:
+            # Add end frame to current animation data if not present so the user
+            # can create an animation with the current single frame pose if desired
+            if len(current_action.fcurves[0].keyframe_points) <= 1:
 
                 self.parameters.OT_source_operator.report(
                     {"INFO"},
                     "Final frame not present, a dummy frame will be added")
 
-                new_action.fcurves[0].keyframe_points.insert(
-                    new_action.fcurves[0].keyframe_points[0].co[0] + self.DUMMY_FRAMES_DISTANCE, # x value of keyframe coordinates + distance
+                current_action.fcurves[0].keyframe_points.insert(
+                    current_action.fcurves[0].keyframe_points[0].co[0] + self.DUMMY_FRAMES_DISTANCE, # x value of keyframe coordinates + distance
                     0)
+
+            new_action = current_action.copy()
+
+            # Attach action to force the timeline to update with the new key
+            self.parameters.context_object.animation_data.action = new_action
+
         else:
             self.parameters.OT_source_operator.report(
                 {"INFO"},
                 "No keyframes present, dummy keyframes will be added")
 
-            new_action = bpy.data.actions.new(self.parameters.asset_name)
             fcurve = new_action.fcurves.new(
                 "AnimationActionCreator",
                 index = 0,
@@ -71,14 +70,11 @@ class AnimationActionCreator:
                 self.DUMMY_FRAMES_DISTANCE,
                 0)
 
-            # TODO AFTER LUNCH: Assign action so we can see the keyframes?
+            # Assign action
+            self.parameters.context_object.animation_data_create()
+            self.parameters.context_object.animation_data.action = new_action
 
-        return print("_create_new_action")
-
-    def _store_animation(self, action: Action) -> None:
-        """test"""
-        return print("_store_animation")
-
+        return new_action
 
 def create_animation_asset(
     OT_source_operator: Operator,
@@ -97,6 +93,8 @@ def create_animation_asset(
         asset_name)
 
     animation_creator = AnimationActionCreator(parameters)
-    animation_action =  animation_creator.create()
+    animation_action =  animation_creator.create_animation_action()
+    animation_action.asset_mark()
+    animation_action.asset_generate_preview()
 
     return animation_action
