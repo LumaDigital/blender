@@ -23,6 +23,10 @@ class AnimationCreationParameters:
 class AnimationActionCreator:
     """test"""
 
+    # If the incorrect number of keyframes is present in the animation data, dummy keyframes
+    # are added with this distance inbetween the start and end frame for clear readibility 
+    DUMMY_FRAMES_DISTANCE = 5
+
     parameters: AnimationCreationParameters
 
     def create(self) -> Optional[Action]:
@@ -36,16 +40,38 @@ class AnimationActionCreator:
     def _create_new_action(self) -> Action:
         """test"""
 
+        new_action = None
         if self.parameters.action  != None:
-            if len(self.parameters.action.fcurves[0].keyframe_points) <= 1:
+
+            new_action = self.parameters.action
+            if len(new_action.fcurves[0].keyframe_points) <= 1:
+
                 self.parameters.OT_source_operator.report(
                     {"INFO"},
                     "Final frame not present, a dummy frame will be added")
 
+                new_action.fcurves[0].keyframe_points.insert(
+                    new_action.fcurves[0].keyframe_points[0].co[0] + self.DUMMY_FRAMES_DISTANCE, # x value of keyframe coordinates + distance
+                    0)
         else:
             self.parameters.OT_source_operator.report(
                 {"INFO"},
                 "No keyframes present, dummy keyframes will be added")
+
+            new_action = bpy.data.actions.new(self.parameters.asset_name)
+            fcurve = new_action.fcurves.new(
+                "AnimationActionCreator",
+                index = 0,
+                action_group = "Animation Actions") # TODO: Look into what data paths are and pass the correct path
+
+            fcurve.keyframe_points.insert(
+                1,
+                0)
+            fcurve.keyframe_points.insert(
+                self.DUMMY_FRAMES_DISTANCE,
+                0)
+
+            # TODO AFTER LUNCH: Assign action so we can see the keyframes?
 
         return print("_create_new_action")
 
