@@ -29,7 +29,6 @@ additional_facial_bones = ['c_teeth_bot', 'c_teeth_top', 'c_lips_bot', 'c_lips_b
 
 facial_transfer_jaw = ["c_lips_bot_01", "c_lips_bot", "c_teeth_bot", "c_chin_01", "c_chin_02", "tong_03", "tong_01", "tong_02"]
 facial_transfer_head = [i for i in additional_facial_bones if not (i in facial_transfer_jaw or 'eyelid' in i)]
-#facial_transfer_ears = ["c_ear_01", "c_ear_02", "c_ear_03", "c_ear_04", "c_ear_05", "c_ear_06"]
 
 blender_version = bpy.app.version_string
 
@@ -1166,7 +1165,7 @@ class ARP_OT_export_fbx(Operator):
                     else:
                         def_fp = self.filepath[:-4] + scn.arp_export_file_separator + export_id + ".fbx"
 
-                bpy.ops.arp_export_scene.fbx(filepath=def_fp, use_selection=True, global_scale=scn.arp_global_scale, use_mesh_modifiers=True, use_armature_deform_only=True, add_leaf_bones=False, apply_unit_scale=True, bake_anim_simplify_factor=scn.arp_simplify_fac, mesh_smooth_type=scn.arp_mesh_smooth_type, use_tspace=scn.arp_use_tspace, primary_bone_axis=scn.arp_bone_axis_primary_export, secondary_bone_axis=scn.arp_bone_axis_secondary_export, shape_keys_baked_data=str(self.shape_keys_data), use_subsurf=False, use_custom_props=False, path_mode='COPY' if scn.arp_export_tex else 'AUTO', embed_textures=scn.arp_export_tex, export_action_only=export_id)
+                bpy.ops.arp_export_scene.fbx(filepath=def_fp, use_selection=True, global_scale=scn.arp_global_scale, use_mesh_modifiers=True, use_armature_deform_only=True, add_leaf_bones=False, apply_unit_scale=True, bake_anim_simplify_factor=scn.arp_simplify_fac, mesh_smooth_type=scn.arp_mesh_smooth_type, use_tspace=scn.arp_use_tspace, primary_bone_axis=scn.arp_bone_axis_primary_export, secondary_bone_axis=scn.arp_bone_axis_secondary_export, shape_keys_baked_data=str(self.shape_keys_data), use_subsurf=False, use_custom_props=True, path_mode='COPY' if scn.arp_export_tex else 'AUTO', embed_textures=scn.arp_export_tex, export_action_only=export_id)
 
             
         #finally:
@@ -1191,8 +1190,18 @@ class ARP_OT_export_fbx(Operator):
             # revert animation curves location scale (x100 Units)
             if self.units_before_export != scn.unit_settings.scale_length:
                 print("\nRevert units changes")
-                for actionname in self.actions_x100_changed:
-                    action = bpy.data.actions[actionname]
+                for act_i in self.actions_x100_changed:
+                    action_name = act_i[0]
+                    lib = act_i[1]
+                    action = None
+                    
+                    if lib:
+                        for act in bpy.data.actions:
+                            if act.name == action_name and act.library == lib:
+                                action = act
+                    else:
+                        action = bpy.data.actions[action_name]
+                    print("RESTORING ACTION SCALE", action_name)
                     for fcurve in action.fcurves:
                         if 'location' in fcurve.data_path:
                             for point in fcurve.keyframe_points:
@@ -1200,8 +1209,8 @@ class ARP_OT_export_fbx(Operator):
                                 point.handle_left[1] *= 0.01
                                 point.handle_right[1] *= 0.01
 
-                if "actionname" in locals():
-                    del actionname
+                if "action_name" in locals():
+                    del action_name
 
                 scn.unit_settings.scale_length = self.units_before_export
 
@@ -1827,12 +1836,7 @@ def is_proxy_bone(bone):
 
     if '_proxy' in bone.name or 'Picker' in bone_parent1 or bone.name == "Picker":
         return True
-
-
-def is_deforming(bone):
-    if get_edit_bone(bone) != None:
-        return get_edit_bone(bone).use_deform
-
+        
 
 def set_inverse_child(b, cns_name):
     pbone = bpy.context.active_object.pose.bones[b]
@@ -1846,8 +1850,14 @@ def set_inverse_child(b, cns_name):
 
 
 def is_facial_enabled(armature):
-    if armature.data.bones.get("c_jawbone.x"):
-        return True
+    # for single head skeleton only
+    head_ref = armature.data.bones.get('head_ref.x')
+    if head_ref:
+        if 'facial' in head_ref.keys():    
+            if head_ref['facial'] == 1:
+                return True
+        else:# backward-compatibility, "manual" evaluation       
+            return bool(armature.data.bones.get("jaw_ref.x"))
     return False
 
 
@@ -3105,8 +3115,8 @@ def _bake_all(armature_name, baked_armature_name, self):
                 split = pbone.name.split("_")
                 if split[len(split)-1] != "childof" and split[len(split)-1] != "basebone":
                     pbone.bone.select = True
-
-
+    
+    
     if scn.arp_bake_type == "NLA":
         print("...................................NLA baking...................................")
 
@@ -3713,8 +3723,8 @@ def _set_units_x100_baked(armature_name, self):
                         has_changed = True
 
             # keep track of modified actions, to revert changes later
-            if has_changed:
-                self.actions_x100_changed.append(action.name)
+            if has_changed:              
+                self.actions_x100_changed.append([action.name, action.library])
 
         # Scale location values, necessary if no actions are exported
         if not self.actions_were_exported:
@@ -4050,7 +4060,7 @@ def _set_humanoid_rig(armature_name, armature_add_name, manual_set_debug, self):
                 delete_edit_bone(ebone)
 
     # Delete default facial
-    if not is_facial_enabled(arp_armature):
+    if not is_facial_enabled(arp_armature):     
         for bone in default_facial_bones:
             if not bone.endswith(".x"):
                 for side in sides:
@@ -4630,8 +4640,10 @@ def _set_humanoid_rig(armature_name, armature_add_name, manual_set_debug, self):
 
             bone_parent_name = ""
 
-            if arp_armature.data.bones[bname].parent:
-                bone_parent_name = arp_armature.data.bones[bname].parent.name
+            eb = arp_armature.data.bones.get(bname)
+            if eb:
+                if eb.parent:
+                    bone_parent_name = eb.parent.name
 
             # override these parents
             _parent = ""
@@ -5807,18 +5819,22 @@ def _set_mped_rig(armature_name, armature_add_name, manual_set_debug, self):
             bones_parent_dict = {}
             for f_bone in ard.facial_deform + ["eyelid_top", "eyelid_bot"]:
 
-                if f_bone[-2:] == ".x":
+                if f_bone.endswith('.x'):
                     bname = f_bone[:-2] + dupli
-                    if get_edit_bone(bname):
-                        parent_name = get_edit_bone(bname).parent.name
-                        bones_parent_dict[bname] = parent_name
+                    b = get_edit_bone(bname)
+                    if b:
+                        if b.parent:
+                            parent_name = b.parent.name
+                            bones_parent_dict[bname] = parent_name
 
                 else:
                     for side in sides:
                         suff = dupli[:-2] + side
-                        if get_edit_bone(f_bone + suff):
-                            ebone = get_edit_bone(f_bone + suff)
-                            bones_parent_dict[f_bone + suff] = ebone.parent.name
+                        b = get_edit_bone(f_bone + suff)
+                        if b:                 
+                            if b.parent:
+                                bones_parent_dict[f_bone + suff] = b.parent.name
+                                
 
             for bname in bones_parent_dict:
                 if "jawbone" in bname:
@@ -5900,9 +5916,7 @@ def _set_mped_rig(armature_name, armature_add_name, manual_set_debug, self):
         # Tail
         for tside in limb_sides.tail_sides:
             first_tail_name = "c_tail_00" + tside
-            if get_data_bone(first_tail_name):
-                tail_00_ref_name = 'tail_00_ref'+tside
-                tail_00_ref = get_edit_bone(tail_00_ref_name)
+            if get_data_bone(first_tail_name):             
                 tail_count = auto_rig.get_tail_count(tside)
 
                 for i in range(0, tail_count):

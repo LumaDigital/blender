@@ -38,40 +38,31 @@ def reset_all():
                 pbone.rotation_euler[i] = 0.0
         
         # Reset Properties
-        if len(pbone.keys()) > 0:
-            for key in pbone.keys():
-                
-                if 'ik_fk_switch' in key:
-                    found_RNA_UI = '_RNA_UI' in pbone.keys()
-                    has_set = False
+        if len(pbone.keys()):
+            try:# Error in some rare cases > Error RuntimeError: IDPropertyGroup changed size during iteration   
+                for key in pbone.keys():
                     
-                    if found_RNA_UI:
-                        if 'default' in pbone['_RNA_UI']['ik_fk_switch']:
-                            pbone['ik_fk_switch'] = pbone['_RNA_UI']['ik_fk_switch']['default']
-                            has_set = True
-                            
-                    if not has_set:
-                        if 'hand' in pbone.name:
-                            pbone['ik_fk_switch'] = 1.0
-                        else:
-                            pbone['ik_fk_switch'] = 0.0
-                 
-                    
-                if 'stretch_length' in key:
-                    pbone['stretch_length'] = 1.0
-                    
-                # don't set auto-stretch to 1 for now, it's not compatible with Fbx export
-                # if 'auto_stretch' in key:
-                #    pbone['auto_stretch'] = 1.0
-                
-                if 'pin' in key:
-                    if 'leg' in key:
-                        pbone['leg_pin'] = 0.0
-                    else:
-                        pbone['elbow_pin'] = 0.0
+                    if key == 'ik_fk_switch':                        
+                        try:
+                            pbone['ik_fk_switch'] = get_prop_setting(pbone, 'ik_fk_switch', 'default')                          
+                        except:
+                            if 'hand' in pbone.name:
+                                pbone['ik_fk_switch'] = 1.0
+                            else:
+                                pbone['ik_fk_switch'] = 0.0
                         
-                if 'bend_all' in key:
-                    pbone['bend_all'] = 0.0
+                    if key == 'stretch_length':
+                        pbone[key] = 1.0                        
+                    # don't set auto-stretch to 1 for now, it's not compatible with Fbx export                   
+                    if key == 'leg_pin':
+                        pbone[key] = 0.0
+                    if key == 'elbow_min':             
+                        pbone[key] = 0.0                        
+                    if key == 'bend_all':
+                        pbone[key] = 0.0
+                        
+            except:
+                pass
                     
        
         reset_child_of_bones = {'c_leg_pole':'startswith', 'c_arms_pole':'startswith', 'hand':'in', 'foot':'in', 'head':'in', 'c_thumb':'startswith', 'c_index':'startswith', 'c_middle':'startswith', 'c_ring':'startswith', 'c_pinky':'startswith', 'c_eye_target':'startswith'}

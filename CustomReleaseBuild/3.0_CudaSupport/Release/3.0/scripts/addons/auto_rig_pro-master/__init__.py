@@ -21,7 +21,7 @@
 bl_info = {
     "name": "Auto-Rig Pro",
     "author": "Artell",
-    "version": (3, 64, 16),
+    "version": (3, 65, 14),
     "blender": (2, 80, 0),
     "location": "3D View > Properties> Auto-Rig Pro",
     "description": "Automatic rig generation based on reference bones and various tools",

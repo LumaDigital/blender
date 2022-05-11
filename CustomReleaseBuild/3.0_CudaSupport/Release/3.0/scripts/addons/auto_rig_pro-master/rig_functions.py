@@ -22,6 +22,7 @@ fingers_root = ["c_index1_base", "c_thumb1_base", "c_middle1_base", "c_ring1_bas
 fingers_start = ["c_thumb", "c_index", "c_middle", "c_ring", "c_pinky"]
 fingers_type_list = ["thumb", "index", "middle", "ring", "pinky"]
 
+                        
 
 # versioning utils, update functions, must be first
 def get_blender_version():
@@ -38,12 +39,19 @@ def get_override_dict_compat():
         return {'LIBRARY_OVERRIDABLE'}
 
 
-def update_layer_set_on(self, context):  
-    set_layer_vis(self, True)
-    
-    
-def update_layer_set_off(self, context):  
-    set_layer_vis(self, False)
+# if layers viz are animated, update on each frame
+@persistent   
+def rig_layers_anim_update(foo):   
+    if bpy.context.scene.arp_layers_animated:
+        for obj in bpy.data.objects:
+            if obj.type == 'ARMATURE':
+                if 'layers_sets' in obj.keys():
+                    for lay in obj.layers_sets:
+                        lay.visibility_toggle = lay.visibility_toggle# hacky but works
+
+        
+def update_visibility_toggle(self, context):
+    set_layer_vis(self, self.visibility_toggle)
     
     
 def update_layer_select(self, context):
@@ -303,6 +311,7 @@ class ARP_MT_layers_sets_menu(Menu):
         layout.prop(scn, "arp_layers_set_render", text="Set Render Visibility")
         layout.prop(scn, "arp_layers_show_exclu", text="Show Exclusive Toggle")
         layout.prop(scn, "arp_layers_show_select", text="Show Select Toggle")
+        layout.prop(scn, 'arp_layers_animated', text="Animated Layers")
         
 
 class ARP_MT_layers_sets_menu_import(Menu):
@@ -577,21 +586,19 @@ class ObjectSet(PropertyGroup):
     object_item : PointerProperty(type=bpy.types.Object)
 
  
-class LayerSet(PropertyGroup):
-    show_toggle_desc = 'Show this layer'
-    hide_toggle_desc = 'Hide this layer'
+class LayerSet(PropertyGroup):  
     exclusive_toggle_desc = 'Only show this layer'
     select_toggle_desc = 'Select bones in this layer'
     objects_set_desc = 'Collection of objects in this set'
+    visibility_toggle_desc = 'Show or hide this layer'
     
     if get_blender_version() >= 290:
         name : StringProperty(default="", description="Limb Name", override={'LIBRARY_OVERRIDABLE'})        
         layers: BoolVectorProperty(size=32, default=(False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False), subtype='LAYER', override={'LIBRARY_OVERRIDABLE'})      
         objects_set : CollectionProperty(type=ObjectSet, description=objects_set_desc, override=get_override_dict_compat())
         collection : PointerProperty(type=bpy.types.Collection, override={'LIBRARY_OVERRIDABLE'})    
-        object_to_add: PointerProperty(type=bpy.types.Object, override={'LIBRARY_OVERRIDABLE'})
-        show_toggle: BoolProperty(default=True, update=update_layer_set_on, override={'LIBRARY_OVERRIDABLE'}, description=show_toggle_desc)
-        hide_toggle: BoolProperty(default=True, update=update_layer_set_off, override={'LIBRARY_OVERRIDABLE'}, description=hide_toggle_desc)
+        object_to_add: PointerProperty(type=bpy.types.Object, override={'LIBRARY_OVERRIDABLE'})        
+        visibility_toggle: BoolProperty(default=True, update=update_visibility_toggle, override={'LIBRARY_OVERRIDABLE'}, description=visibility_toggle_desc, options={'ANIMATABLE'})       
         exclusive_toggle: BoolProperty(default=False, update=update_layer_set_exclusive, override={'LIBRARY_OVERRIDABLE'}, description=exclusive_toggle_desc)
         select_toggle: BoolProperty(default=True, update=update_layer_select, override={'LIBRARY_OVERRIDABLE'}, description=select_toggle_desc)
         show_objects: BoolProperty(default=True, override={'LIBRARY_OVERRIDABLE'})
@@ -603,9 +610,8 @@ class LayerSet(PropertyGroup):
         layers: BoolVectorProperty(size=32, default=(False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False), subtype='LAYER')      
         objects_set : CollectionProperty(type=ObjectSet, description=objects_set_desc)
         collection : PointerProperty(type=bpy.types.Collection)   
-        object_to_add: PointerProperty(type=bpy.types.Object)        
-        show_toggle: BoolProperty(default=True, update=update_layer_set_on, description=show_toggle_desc)
-        hide_toggle: BoolProperty(default=True, update=update_layer_set_off, description=hide_toggle_desc)
+        object_to_add: PointerProperty(type=bpy.types.Object)  
+        visibility_toggle: BoolProperty(default=True, update=update_visibility_toggle, description=visibility_toggle_desc, options={'ANIMATABLE'})       
         exclusive_toggle: BoolProperty(default=False, update=update_layer_set_exclusive, description=exclusive_toggle_desc)    
         select_toggle: BoolProperty(default=True, update=update_layer_select, description=select_toggle_desc)        
         show_objects: BoolProperty(default=True)        
@@ -626,8 +632,9 @@ class ARP_UL_layers_sets_list(UIList):
         row.prop(item, "name", text="", emboss=False, translate=False)# icon='BONE_DATA')
         if scn.arp_layers_show_select:
             row.prop(item, "select_toggle", text="", icon='RESTRICT_SELECT_OFF', emboss=False)
-        row.prop(item, "show_toggle", text="", icon='HIDE_OFF', emboss=False)
-        row.prop(item, "hide_toggle", text="", icon='HIDE_ON', emboss=False)   
+        row.prop(item, 'visibility_toggle', text='', icon='HIDE_OFF' if item.visibility_toggle else 'HIDE_ON', emboss=False)      
+        #row.prop(item, "show_toggle", text="", icon='HIDE_OFF', emboss=False)
+        #row.prop(item, "hide_toggle", text="", icon='HIDE_ON', emboss=False)   
         if scn.arp_layers_show_exclu:
             icon_name = 'SOLO_ON' if item.exclusive_toggle else 'SOLO_OFF'            
             row.prop(item, "exclusive_toggle", text="", icon=icon_name, emboss=False)#icon='LAYER_ACTIVE'
@@ -871,9 +878,9 @@ class ARP_OT_rotation_mode_convert(Operator):
             self.report({'ERROR'}, "This only works for animated bones")
             return {'FINISHED'}
             
-        self.frame_start, self.frame_end = action.frame_range[0], action.frame_range[1]
+        self.frame_start, self.frame_end = int(action.frame_range[0]), int(action.frame_range[1])
         
-        self.text_title = 'Quaternions' if self.mode == 'rotation_quaternion' else 'Euler'     
+        self.text_title = 'Quaternions' if self.mode == 'rotation_quaternion' else 'Euler'
     
         wm = context.window_manager
         return wm.invoke_props_dialog(self, width=400)
@@ -1869,7 +1876,7 @@ def _childof_switcher(self):
                 if debug:
                     print("  object type")
                 obj_par = get_object(parent_name)
-                pb.matrix = cns.inverse_matrix.inverted() @ obj_par.matrix_world.inverted() @ pb.matrix
+                pb.matrix = cns.inverse_matrix.inverted() @ obj_par.matrix_world.inverted() @ mat_prev#pb.matrix
                 
             # auto keyframe
             if scn.tool_settings.use_keyframe_insert_auto:
@@ -2041,6 +2048,7 @@ def draw_layer_set_edit(self, context):
 
     
 def set_layer_vis(self, state):
+    #print("SET LAYER VIZ")
     rig = bpy.context.active_object
     scn = bpy.context.scene
     
@@ -3660,6 +3668,8 @@ class ARP_PT_BoneCustomProps(Panel, ArpRigToolsPanel):
                 
         if len(active_bone.keys()):
             for prop_name in active_bone.keys():
+                if prop_name.startswith('_RNA_'):
+                    continue
                 row = col.row(align=True)
                 row.prop(active_bone, '["'+prop_name+'"]')
                 btn = row.operator(ARP_OT_property_pin.bl_idname, text='', icon='UNPINNED')
@@ -3771,8 +3781,12 @@ class ARP_PT_RigProps_Settings(Panel, ArpRigToolsPanel):
             
             layout.separator() 
             
-            # Stretch length property
             if is_selected(fk_arm, selected_bone_name):
+                # FK Lock property
+                c_shoulder = get_pose_bone("c_shoulder" + bone_side)
+                if 'arm_lock' in c_shoulder.keys():
+                    layout.prop(c_shoulder, '["arm_lock"]', text="Arm Lock", slider=True)
+                # stretch length property
                 layout.prop(get_pose_bone("c_hand_fk" + bone_side), '["stretch_length"]', text="Stretch Length (FK)", slider=True)
             if is_selected(ik_arm, selected_bone_name):
                 layout.prop(get_pose_bone("c_hand_ik" + bone_side), '["stretch_length"]', text="Stretch Length (IK)", slider=True)
@@ -4094,6 +4108,8 @@ def register():
     update_arp_tab()
     update_layers_set_presets()
     
+    bpy.app.handlers.frame_change_post.append(rig_layers_anim_update)
+    
     if get_blender_version() >= 290:
         bpy.types.Object.layers_sets = CollectionProperty(type=LayerSet, name="Layers Set", description="List of bones layers set", override=get_override_dict_compat())
         bpy.types.Object.layers_sets_idx = IntProperty(name="List Index", description="Index of the layers set list", default=0, override={'LIBRARY_OVERRIDABLE'})
@@ -4105,14 +4121,16 @@ def register():
     bpy.types.Scene.arp_layers_set_render = BoolProperty(name="Set Render Visibility", description="Set objects visibility for rendering as well (not only viewport)", default=False)  
     bpy.types.Scene.arp_layers_show_exclu = BoolProperty(name="Show Exclusive Toggle", description="Show the exclusive visibility toggle of rig layers")
     bpy.types.Scene.arp_layers_show_select = BoolProperty(name="Show Select Toggle", description="Show the select toggle of rig layers")
-
-
+    bpy.types.Scene.arp_layers_animated = BoolProperty(name="Animated Layers", description="Update animated rig layers visibility on each frame")   
+    
 
 def unregister():
     from bpy.utils import unregister_class
 
     for cls in classes:
         unregister_class(cls)
+        
+    bpy.app.handlers.frame_change_post.remove(rig_layers_anim_update) 
 
     del bpy.types.Object.layers_sets
     del bpy.types.Object.layers_sets_idx
@@ -4120,4 +4138,6 @@ def unregister():
     del bpy.types.Scene.arp_layers_set_render
     del bpy.types.Scene.arp_layers_show_exclu
     del bpy.types.Scene.arp_layers_show_select    
+    del bpy.types.Scene.arp_layers_animated    
+    
     
