@@ -390,7 +390,7 @@ def assign_control_variables():
     bpy.types.Scene.vse_frame_start  = ( 
         bpy.props.IntProperty(name = "Start Frame: ", min=1, default=1))
     bpy.types.Scene.vse_frame_end  = ( 
-        bpy.props.IntProperty(name = "End Frame: ", default=300, max=300))
+        bpy.props.IntProperty(name = "End Frame: ", default=300))
     bpy.types.Scene.vse_frame_rate  = ( 
         bpy.props.IntProperty(name = "Frame Rate: ", default=30))
     bpy.types.Scene.vse_max_render_samples  = ( 
