@@ -59,44 +59,112 @@ class ARP_MT_remap_export(Menu):
     
     def draw(self, _context):   
         layout = self.layout
-        layout.operator("arp.remap_export_preset", text="Save as New Preset")  
+        layout.operator("arp.remap_export_preset", text="Save as New Preset")
 
-class VSE_Retarget_Mocap(bpy.types.Operator):
-    """VSE Tool to automatically import, set up motion-capture (.bvh) and ready the rigs for retargetting"""  
+
+class ARP_OT_VSE_Retarget_Mocap(bpy.types.Operator):
+    """VSE Tool to automatically import, set up motion-capture (.bvh or .fbx) and ready the rigs for retargetting"""  
     
     bl_idname = "arp.remap_vse_automate_mocap_target"
     bl_label = "Mocap retarget"
-    
+    custom_key = "vse_selected_action"
+
     _mocap_file_path = None
     _bones_preset_path = None
     _mocap_obj = None
     _rig_obj = None
+    _is_bvh_file = None
     _disabled_collections = []
+    _actions_list = []
 
-    def execute(self, context):
-        
+    def invoke(self, context, event):
+
         # Assign UI variables
         self._mocap_file_path = bpy.context.scene.vse_bvh_path
         self._bones_preset_path = bpy.context.scene.vse_bones_preset_path
 
         if self.validate_mocap_Path():
+            self.import_mocap()
+        else:
+            self.report({'ERROR'}, 'Invalid mocap file selected! (Please select .fbx or .bvh mocap files)')
+            return {'FINISHED'} 
+
+        if  self._is_bvh_file:
+            return self.execute(context)
+
+        if len(bpy.data.actions) == 0:
+            self.report({'ERROR'}, 'No actions found')
+            return {'FINISHED'}            
+
+        self._actions_list = []
+        for action in bpy.data.actions:
+            if not action.name in self._actions_list:
+                self._actions_list.append(action.name)
+                
+        return context.window_manager.invoke_props_dialog(self, width=450)
+
+    def draw(self, context):
+        layout = self.layout
+        for action_name in self._actions_list:
+            column = layout.column(align=True)      
+            self.draw_action_row(column, action_name)          
+      
+        layout.separator()      
+
+    def draw_action_row(self, column, action_name):
+        row = column.row(align=True)
+        row.label(text=action_name)
+        icon_name = 'CHECKBOX_DEHLT'
+
+        action = bpy.data.actions.get(action_name)
+        if len(action.keys()):
+            if self.custom_key in action.keys():
+                if action[self.custom_key]:
+                    icon_name = 'CHECKBOX_HLT' # selected_action
+
+        select_action_operator = row.operator('arp.fbx_action_selection', text='', icon=icon_name)
+        select_action_operator.action_name = action_name
+
+    def execute(self, context):
+
+        if  self._is_bvh_file:
             self.target_mocap()
-            
+        else:
+            for action in bpy.data.actions:
+                if self.custom_key not in action.keys():
+                    self.report({'ERROR'}, "No action selected!")
+                    return {'CANCELLED'} 
+
+                if action[self.custom_key]:
+                    self._mocap_obj.animation_data.action = action
+                    self.target_mocap()
+                    break
+
         return {'FINISHED'}
 
-    
+    def import_mocap(self):
+        self.handle_collections_view(hide = False)
+
+        bpy.context.scene.render.fps = 30
+
+        if self._is_bvh_file == True:
+            bpy.ops.import_anim.bvh(filepath=self._mocap_file_path, global_scale= 0.01, use_fps_scale= True)
+        elif self._is_bvh_file == False:
+            bpy.ops.import_scene.fbx(filepath=self._mocap_file_path, use_anim= True, automatic_bone_orientation= True)
+            for mesh in bpy.context.view_layer.objects.active.children:
+                bpy.data.objects.remove(mesh)
+
+        self._mocap_obj = bpy.context.view_layer.objects.active
+
     def target_mocap(self):
         
         print("\n=====================================================================================")
         print("VSE Automation\n\nLoading motion capture file")
 
-        self.handle_collections_view(hide = False)
-
-        bpy.ops.import_anim.bvh(filepath=self._mocap_file_path, global_scale= 0.01, use_fps_scale= True)
-        self._mocap_obj = bpy.context.view_layer.objects.active
-        mocap_obj_collection_name = self._mocap_obj.users_collection[0].name
         self._rig_obj = bpy.data.objects[bpy.context.scene.vse_rig_name]
         rig_obj_collection_name = self._rig_obj.users_collection[0].name
+
+        mocap_obj_collection_name = self._mocap_obj.users_collection[0].name
 
         if mocap_obj_collection_name != 'Scene Collection':
             bpy.data.collections[mocap_obj_collection_name].objects.unlink(self._mocap_obj)
@@ -118,8 +186,11 @@ class VSE_Retarget_Mocap(bpy.types.Operator):
         self.handle_collections_view(hide = True)
 
     def validate_mocap_Path(self):
-        if (self._mocap_file_path[-3:] != "bvh"):
-            self.show_message_box("Please select .bvh file", "File not bvh!", 'ERROR')
+        if self._mocap_file_path[-3:] == "bvh":
+            self._is_bvh_file = True
+        elif self._mocap_file_path[-3:] == "fbx":
+            self._is_bvh_file = False
+        else:
             return False
         
         return True
@@ -139,7 +210,26 @@ class VSE_Retarget_Mocap(bpy.types.Operator):
             else:
                 if collection in self._disabled_collections:
                     collection.hide_viewport = hide
+                self._disabled_collections *= 0
 
+
+class ARP_OT_VSE_Select_FBX_Action(Operator):
+    """FBX animation selection"""
+    bl_idname = "arp.fbx_action_selection"
+    bl_label = "Select FBX animation"
+    bl_options = {'UNDO'}
+
+    action_name : StringProperty(default="")
+
+    def execute(self, context):
+        for action in bpy.data.actions:
+            if ARP_OT_VSE_Retarget_Mocap.custom_key not in action.keys():
+                action[ARP_OT_VSE_Retarget_Mocap.custom_key] = None
+
+            action[ARP_OT_VSE_Retarget_Mocap.custom_key] = action.name == self.action_name
+
+        return {'FINISHED'}
+ 
 
 class ARP_OT_remap_export_preset(Operator):
     """Export as custom preset"""
@@ -3993,7 +4083,7 @@ class ARP_PT_auto_rig_remap_panel(Panel):
             
             # VSE Work #
             row = layout.row()
-            row.label(text="VSE Mocap Path (.bvh):")
+            row.label(text="VSE Mocap Path (.bvh / .fbx):")
             row = layout.row()
             row.prop(scn, "vse_bvh_path")
             row = layout.row()
@@ -4198,7 +4288,7 @@ class ARP_PT_auto_rig_remap_panel(Panel):
 ###########  REGISTER  ##################
 
 classes = (ARP_OT_clear_tweaks, ARP_OT_synchro_select, ARP_UL_items, ARP_OT_freeze_armature, ARP_OT_redefine_rest_pose, ARP_OT_auto_scale, ARP_OT_apply_offset, ARP_OT_cancel_redefine, ARP_OT_copy_bone_rest, ARP_OT_copy_raw_coordinates, ARP_OT_pick_object, ARP_OT_export_config, ARP_OT_import_config, ARP_OT_retarget, ARP_OT_build_bones_list, BoneRemapSettings, ARP_PT_auto_rig_remap_panel, ARP_OT_bind_only, ARP_MT_remap_import, ARP_MT_remap_export, ARP_OT_remap_export_preset, ARP_OT_import_config_preset, ARP_OT_save_pose_rest, ARP_OT_batch_retarget,
-ARP_OT_toggle_action_remap, ARP_OT_enable_all_actions, ARP_OT_disable_all_actions, VSE_Retarget_Mocap)
+ARP_OT_toggle_action_remap, ARP_OT_enable_all_actions, ARP_OT_disable_all_actions, ARP_OT_VSE_Retarget_Mocap, ARP_OT_VSE_Select_FBX_Action)
 
 def update_arp_tab():
     try:
@@ -4231,13 +4321,13 @@ def register():
             name = "",
             description = "File path location for bones preset (.bmap)",
             subtype = "FILE_PATH",
-            default = "N:\\Cricket\\assets\\Blender_Remap_Presets\\Bwler_BVH_FK_remap_preset.bmap"))
+            default = "N:\\Cricket\\assets\\Blender_Remap_Presets\\MoBu_2_Mixamo.bmap"))
             
     bpy.types.Scene.vse_rig_name = ( 
         bpy.props.StringProperty(
             name = "",
             description = "Name of the model object you want to apply the motion capture to",
-            default = "cricket_player_rig"))
+            default = "Armature"))
 
     bpy.types.Scene.target_rig = StringProperty(name = "Target Rig", default="", description="Destination armature to re-target the action", update=update_target_rig)
     bpy.types.Scene.source_rig = StringProperty(name = "Source Rig", default="", description="Source rig armature to take action from", update=update_source_rig)
