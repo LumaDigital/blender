@@ -45,6 +45,9 @@ class Render_And_Composite(bpy.types.Operator):
 
     _team_one_material_name = "Player_01_Mat"
     _team_two_material_name = "Player_02_Mat"
+
+    preview_team_one_material_name = "clothes_MAT"
+    preview_team_two_material_name = "clothes_MAT.004"
     
     _vv_tools_path = None
     _multi_comp_vv_path = None 
@@ -64,7 +67,8 @@ class Render_And_Composite(bpy.types.Operator):
     _frame_start = 1
     _frame_end = 300
     _frame_rate = 30
-    
+
+    _preview_render = False
     _exr_render = True
     _exr_back = True
     _exr_actors = True
@@ -79,21 +83,26 @@ class Render_And_Composite(bpy.types.Operator):
         self._initialization_text()
         self._assign_ui_variables()
         self._setup_scene()
-        self._setup_actors()
+
+        if self._preview_render:
+            self._setup_actors(self.preview_team_one_material_name, self.preview_team_two_material_name)
+            self._setup_and_run_back_render()
+        else:
+            self._setup_actors(self._team_one_material_name, self._team_two_material_name)
+
+            if self._exr_render:
+                if self._exr_back:
+                    self._setup_and_run_back_render()
+                if self._exr_actors:
+                    self._setup_and_run_actors_render()
+                if self._exr_uvs:
+                    self._setup_and_run_uvs_render()
         
-        if self._exr_render:
-            if self._exr_back:
-                self._setup_and_run_back_render()
-            if self._exr_actors:
-                self._setup_and_run_actors_render()
-            if self._exr_uvs:
-                self._setup_and_run_uvs_render()
-        
-        if self._check_for_tools():
-            if self._composite:
-                self._initialize_comp_vv()
-            if self._make_vv:
-                self._initialize_make_vv()
+            if self._check_for_tools():
+                if self._composite:
+                    self._initialize_comp_vv()
+                if self._make_vv:
+                    self._initialize_make_vv()
             
         print("\n=====================================================================================")
         print ("\nRender processes completed successfully")    
@@ -113,6 +122,7 @@ class Render_And_Composite(bpy.types.Operator):
         self._png_output_path = bpy.context.scene.vse_png_output_path
         self._max_render_samples = bpy.context.scene.vse_max_render_samples
         self._frame_rate = bpy.context.scene.vse_frame_rate
+        self._preview_render = bpy.context.scene.vse_preview_render    
         self._exr_render = bpy.context.scene.vse_exr_render    
         self._exr_back = bpy.context.scene.vse_exr_back
         self._exr_actors = bpy.context.scene.vse_exr_actors
@@ -129,6 +139,7 @@ class Render_And_Composite(bpy.types.Operator):
         print ("_frame_end: " + str(self._frame_end))
         print ("_frame_rate: " + str(self._frame_rate))
         print ("Render Options:")
+        print ("Preview Render: " + str(self._preview_render))
         print ("EXRS: " + str(self._exr_render))
         
         if self._exr_render: 
@@ -150,7 +161,7 @@ class Render_And_Composite(bpy.types.Operator):
     def set_resolution(self, resolution_x, resolution_y):
         bpy.context.scene.render.resolution_x = resolution_x
         bpy.context.scene.render.resolution_y = resolution_y
-    
+
     def _setup_and_run_back_render(self):  
         self._current_EXR_render_name = "Back"     
         self.set_resolution(self._render_resolution_x, self._render_resolution_y)
@@ -265,23 +276,25 @@ class Render_And_Composite(bpy.types.Operator):
         print("=============== " + self._current_EXR_render_name + " EXR renders complete")
     
     
-    def _setup_actors(self):     
+    def _setup_actors(self, team_A_material, team_B_material):     
         print ("\nSetting up Actors:\n")
         
         geos_modified = ""
         for actor_obj in bpy.data.collections["TeamA"].objects:
-            self._assign_team_material(actor_obj, self._team_one_material_name)
+            self._assign_team_material(actor_obj, team_A_material)
             geos_modified += actor_obj.name + "\t"
                 
         for actor_obj in bpy.data.collections["TeamB"].objects:
-            self._assign_team_material(actor_obj, self._team_two_material_name)
+            self._assign_team_material(actor_obj, team_B_material)
             geos_modified += "\t" + actor_obj.name
         
         print("Actors' geos:\n" + geos_modified + "\n\nSuccessfully setup for vision video rendering")
             
     def _assign_team_material(self, actor, material_name):
         self._assign_materials_to_children_recursive(actor, bpy.data.materials[material_name])
-        bpy.data.materials[material_name].node_tree.nodes["Mix.001"].inputs[0].default_value = 0 # Node name has been change but the action still returns "Mix.001"
+        actor_node = bpy.data.materials[material_name].node_tree.nodes.get("Mix.001", None)
+        if actor_node != None:
+            actor_node.inputs[0].default_value = 0 # Node name has been change but the action still returns "Mix.001"
         
     def _assign_materials_to_children_recursive(self, obj, material):
 
@@ -342,19 +355,27 @@ class Render_Tool_Panel(bpy.types.Panel):
         row.prop(scn, "vse_max_render_samples")
     
         layout.row().separator(factor=3)
+
         row = layout.row()
-        row.prop(scn, "vse_exr_render")
+        row.prop(scn, "vse_preview_render")
+
+        if not bpy.context.scene.vse_preview_render:
+
+            row = layout.row()
+            row.prop(scn, "vse_exr_render")
         
-        row = layout.row()
-        if bpy.context.scene.vse_exr_render:
-            row.prop(scn, "vse_exr_back")
-            row.prop(scn, "vse_exr_actors")
-            row.prop(scn, "vse_exr_uvs")
+            row = layout.row()
+            if bpy.context.scene.vse_exr_render:
+                row.prop(scn, "vse_exr_back")
+                row.prop(scn, "vse_exr_actors")
+                row.prop(scn, "vse_exr_uvs")
         
-        row = layout.row()
-        row.prop(scn, "vse_composite")
-        row = layout.row()
-        row.prop(scn, "vse_make_vv")
+            row = layout.row()
+            row.prop(scn, "vse_composite")
+            row = layout.row()
+            row.prop(scn, "vse_make_vv")
+
+
         col = layout.column(align=True)
         col.operator("vse.render", text="Initialize", icon="TIME")
         row = layout.row()
@@ -400,7 +421,8 @@ def assign_control_variables():
         bpy.props.IntProperty(name = "Frame Rate: ", default=30))
     bpy.types.Scene.vse_max_render_samples  = ( 
         bpy.props.IntProperty(name = "Actors/Back render sample: ", default=128))
-        
+
+    bpy.types.Scene.vse_preview_render = bpy.props.BoolProperty(name = "Render Beauty Preview", default=False)
     bpy.types.Scene.vse_exr_render = bpy.props.BoolProperty(name = "Render EXRs", default=True)
     
     bpy.types.Scene.vse_exr_back = bpy.props.BoolProperty(name = "Back", default=True)
