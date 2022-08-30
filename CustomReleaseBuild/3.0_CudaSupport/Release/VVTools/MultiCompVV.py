@@ -52,11 +52,7 @@ class MultiCompVV(object):
         for _frame in range(self._frame_count):
 
             _current_frame = self._from_frame + _frame;
-
-            if _current_frame == '0':
-                 _current_frame = str(_current_frame + 1).zfill(4);
-            else:
-                _current_frame = str(_current_frame).zfill(4);
+            _current_frame = str(_current_frame).zfill(4);
 
             _Back_EXR_Path = os.path.join(self._input_path, "Back");
             _Back_EXR_Path = _Back_EXR_Path + '_' + _current_frame + '.exr';
@@ -96,6 +92,7 @@ class MultiCompVV(object):
                 logging.info("" + str(stdout_data))
                 logging.info("\nError: Compvv failed")
                 logging.info("_______________________________________________________________________________________\n")
+                sys.exit(1)
                 return False
             else:
                 logging.info("-Success-")
@@ -161,3 +158,4 @@ class MultiCompVV(object):
 if __name__ == "__main__":
     program = MultiCompVV()
     program.main()
+    sys.exit(0)
