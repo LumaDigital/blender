@@ -32,14 +32,11 @@ class Rendering_Engine():
     _max_render_samples = 128
     _min_render_samples = 1 # UV has no light data, therefore uses low sampling
 
-    _exr_render = True
-    _exr_back = True
-    _exr_actors = True
-    _exr_uvs = True
-    _composite = True
-    _make_vv = True
-
-    _current_EXR_render_name = None
+    _exr_back = False
+    _exr_actors = False
+    _exr_uvs = False
+    _composite = False
+    _make_vv = False
 
     def __init__(self,
                 _exr_output_path,
@@ -49,7 +46,6 @@ class Rendering_Engine():
                 _frame_end,
                 _frame_rate,
                 _max_render_samples,
-                _exr_render,
                 _exr_back,
                 _exr_actors,
                 _exr_uvs,
@@ -63,7 +59,6 @@ class Rendering_Engine():
         self._frame_end = _frame_end
         self._frame_rate = _frame_rate
         self._max_render_samples = _max_render_samples
-        self._exr_render = _exr_render
         self._exr_back = _exr_back
         self._exr_actors = _exr_actors
         self._exr_uvs = _exr_uvs
@@ -73,18 +68,33 @@ class Rendering_Engine():
     def render_and_composite(self):
 
         print("\n=====================================================================================")
-        print("VSE Render Automation\n")
+        print("VSE Render Automation")
 
         self.log_inputs()
         self._setup_scene()
 
-        if self._exr_render:
-            if self._exr_back:
-                self._setup_and_run_back_render()
-            if self._exr_actors:
-                self._setup_and_run_actors_render()
-            if self._exr_uvs:
-                self._setup_and_run_uvs_render()
+        _render_back_actors = False
+        if self._exr_back:
+            bpy.context.scene.view_layers["Back"].use = True
+            _render_back_actors = True
+            self._setup_back_render()
+        if self._exr_actors:
+            bpy.context.scene.view_layers["Actors"].use = True
+            _render_back_actors = True
+            self._setup_actors_render()
+
+        if _render_back_actors:
+            print("\nRendering Back/Actors EXRs:\n")
+            bpy.context.scene.view_layers["UV"].use = False
+            bpy.ops.render.render(animation=True)
+
+        if self._exr_uvs:
+            print("\nRendering UV EXRs:\n")
+            self._setup_uvs_render()
+            bpy.context.scene.view_layers["UV"].use = True
+            bpy.context.scene.view_layers["Back"].use = False
+            bpy.context.scene.view_layers["Actors"].use = False
+            bpy.ops.render.render(animation=True)
         
         if self._check_for_tools():
             if self._composite:
@@ -107,13 +117,9 @@ class Rendering_Engine():
         print ("_frame_end: " + str(self._frame_end))
         print ("_frame_rate: " + str(self._frame_rate))
         print ("Render Options:")
-        print ("EXRS: " + str(self._exr_render))
-        
-        if self._exr_render: 
-            print("\tBack: " + str(self._exr_back))
-            print("\tActors: " + str(self._exr_actors))
-            print("\tUVs: " + str(self._exr_uvs))
-            
+        print("Render Back EXRs: " + str(self._exr_back))
+        print("Render Actors EXRs: " + str(self._exr_actors))
+        print("Render UVs EXRs: " + str(self._exr_uvs))   
         print ("PNGs: " + str(self._composite))
         print ("VV: " + str(self._make_vv))
         
@@ -121,6 +127,7 @@ class Rendering_Engine():
         self._vv_tools_path = os.path.join(binary_path, "VVTools")
 
     def _setup_scene(self):
+        bpy.context.scene.render.use_single_layer = False
         bpy.context.scene.frame_start = self._frame_start
         bpy.context.scene.frame_end = self._frame_end
         bpy.context.scene.render.fps = self._frame_rate
@@ -129,48 +136,27 @@ class Rendering_Engine():
         bpy.context.scene.render.resolution_x = resolution_x
         bpy.context.scene.render.resolution_y = resolution_y
 
-    def _pre_render_handle(self):
-        print("\n=============== " + self._current_EXR_render_name + " EXR renders initialized")
-        print("Frame Range: " + str(self._frame_start) + "-" + str(self._frame_end) + "\n")
-        
-    def _render_complete_handle(self):
-        print("\nOutput path: " + self._exr_output_path)
-        print("=============== " + self._current_EXR_render_name + " EXR renders complete")
-
-    def _setup_and_run_back_render(self):  
-        self._current_EXR_render_name = "Back"     
+    def _setup_back_render(self):     
         self.set_resolution(self._RENDER_RESOLUTION_X, self._RENDER_RESOLUTION_Y)
         bpy.context.scene.cycles.samples = self._max_render_samples
         bpy.context.scene.node_tree.nodes[
             self._BLENDER_COMPOSITING_BACK_EXR_OUTPUT_NODE_NAME].base_path = os.path.join(self._exr_output_path, "Back_####.exr")
-        self._pre_render_handle()
-        bpy.ops.render.render(animation=True, layer=self._current_EXR_render_name)
-        self._render_complete_handle()
 
-    def _setup_and_run_actors_render(self): 
-        self._current_EXR_render_name = "Actors"         
+    def _setup_actors_render(self):         
         self.set_resolution(self._RENDER_RESOLUTION_X, self._RENDER_RESOLUTION_Y)
         bpy.context.scene.cycles.samples = self._max_render_samples
         bpy.context.scene.node_tree.nodes[
             self._BLENDER_COMPOSITING_ACTORS_EXR_OUTPUT_NODE_NAME].base_path = os.path.join(self._exr_output_path, "Actors_####.exr")
-        self._pre_render_handle()
-        bpy.ops.render.render(animation=True, layer=self._current_EXR_render_name)
-        self._render_complete_handle()
 
-    def _setup_and_run_uvs_render(self): 
-        self._current_EXR_render_name = "UV"          
+    def _setup_uvs_render(self):          
         self.set_resolution(self._RENDER_RESOLUTION_X * 5, self._RENDER_RESOLUTION_Y * 5)
         bpy.context.scene.cycles.samples = self._min_render_samples
         bpy.context.scene.node_tree.nodes[
             self._BLENDER_COMPOSITING_UVS_EXR_OUTPUT_NODE_NAME].base_path = os.path.join(self._exr_output_path, "UV_####.exr")
-        self._pre_render_handle()
-        bpy.ops.render.render(animation=True, layer=self._current_EXR_render_name)
-        self._render_complete_handle()
 
     def _check_for_tools(self):   
         tools_missing = ""       
         self._multi_comp_vv_path = os.path.join(self._vv_tools_path, self._VV_MULTI_COMP_NAME)
-        print(self._multi_comp_vv_path)  
         if not os.path.exists(self._multi_comp_vv_path):
             tools_missing += "\t" + self._VV_MULTI_COMP_NAME
             
