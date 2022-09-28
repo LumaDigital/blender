@@ -17,18 +17,24 @@ _frame_end = 300
 _frame_rate = 30
 _max_render_samples = 128
 
-_render_exrs = False
+_render_back_exrs = False
+_render_actors_exrs = False
+_render_uvs_exrs = False
 _composite_pngs = False
 _generate_vv = False
 
 def Assign_Variables():
 
     print("_______________________________________________________________________________________(switches):")
-    # Creating the options for commandline switches
+    print("Commandline Rendering Arguments")
+
     opts, args = getopt.getopt(
-        sys.argv[4:],
+        sys.argv[5:],
         "",
-        ["blendfilepath=",
+        ["cycles-device=",
+            "renderback=",
+            "renderactors=",
+            "renderuvs=",
             "exroutput=",
             "pngoutput=",
             "visionoutput=",
@@ -36,11 +42,12 @@ def Assign_Variables():
             "frameend=",
             "framerate=",
             "rendersamples=",
-            "renderexr=",
             "compositepng=",
             "generatevv="])
 
-    _expected_options = ["--blendfilepath",
+    _expected_options = ["--renderback",
+                            "--renderactors",
+                            "--renderuvs",
                             "--exroutput",
                             "--pngoutput",
                             "--visionoutput",
@@ -48,17 +55,11 @@ def Assign_Variables():
                             "--frameend",
                             "--framerate",
                             "--rendersamples",
-                            "--renderexr",
                             "--compositepng",
                             "--generatevv"]
+
     _added_options = []
     for opt, arg in opts:
-        if opt == "--blendfilepath":
-            global _blend_file_path
-            _blend_file_path = arg
-            _added_options.append(opt)
-            print("blend file path:     " + arg)
-
         if opt == "--exroutput":
             global _exr_output_path
             _exr_output_path = arg
@@ -101,12 +102,26 @@ def Assign_Variables():
             _added_options.append(opt)
             print("Render Samples: " + arg)
 
-        if opt == "--renderexr":
-            global _render_exrs
+        if opt == "--renderback":
+            global _render_back_exrs
             if arg == "True":
-                _render_exrs = True
+                _render_back_exrs = True
             _added_options.append(opt)
-            print("Render EXRs: " + arg)
+            print("Render Back EXRs: " + arg)
+
+        if opt == "--renderactors":
+            global _render_actors_exrs
+            if arg == "True":
+                _render_actors_exrs = True
+            _added_options.append(opt)
+            print("Render Actors EXRs: " + arg)
+
+        if opt == "--renderuvs":
+            global _render_uvs_exrs
+            if arg == "True":
+                _render_uvs_exrs = True
+            _added_options.append(opt)
+            print("Render UV EXRs: " + arg)
 
         if opt == "--compositepng":
             global _composite_pngs
@@ -130,18 +145,18 @@ def Assign_Variables():
             _missing_option = True
             _missing_string += opt + ", "
 
+    _success = True
     if(_missing_option):
         print(_missing_string)
-        print("_______________________________________________________________________________________\n")
-        return False
+        _success = False
     else:
         print("\nall inputs recorded")
 
-    return True
+    print("_______________________________________________________________________________________(switches):")
+
+    return _success
 
 def render_and_composite():
-
-    bpy.ops.wm.open_mainfile(filepath=_blend_file_path)
 
     _rendering_engine = VSERender_Engine.Rendering_Engine(_exr_output_path,
                                                             _png_output_path,
@@ -150,10 +165,9 @@ def render_and_composite():
                                                             int(_frame_end),
                                                             int(_frame_rate),
                                                             int(_max_render_samples),
-                                                            _render_exrs,  
-                                                            _render_exrs,
-                                                            _render_exrs,
-                                                            _render_exrs,
+                                                            _render_back_exrs,  
+                                                            _render_actors_exrs,
+                                                            _render_uvs_exrs,
                                                             _composite_pngs,
                                                             _generate_vv)
 
@@ -167,7 +181,9 @@ if len(sys.argv) > 1:
         print("VSE Commandline Rendering FAILED: Missing switches")
         print("Ensure all options have been passed\nBelow is a list of the required options")
         print("______________________________________\n")
-        print("--blendfilepath = Blend scene file path")
+        print("--renderback = Toggle for rendering back EXRS")
+        print("--renderactors = Toggle for rendering actors EXRS")
+        print("--renderuvs = Toggle for rendering UVs EXRS")
         print("--exroutput = EXR renders output path")
         print("--pngoutput = PNG composites output path")
         print("--visionoutput = Vision Video output path")
@@ -175,7 +191,6 @@ if len(sys.argv) > 1:
         print("--frameend = End frame for render")
         print("--framerate = Frame rate for rendered video")
         print("--rendersamples = Render samples for Back and Actors EXR renders")
-        print("--renderexr = Toggle for rendering EXRS (uses --blendfilepath)")
         print("--compositepng = Toggle for compositing PNGs (uses --exroutput)")
         print("--generatevv = Toggle for generating VV file (uses --pngoutput)")
         print("______________________________________\n")
