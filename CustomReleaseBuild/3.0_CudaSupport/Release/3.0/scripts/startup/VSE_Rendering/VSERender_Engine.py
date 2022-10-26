@@ -5,6 +5,10 @@ import bpy
 
 class Rendering_Engine():
 
+    # We only use composite outputs, but Blender still renders frames to the scene's output.
+    # To avoid overwriting artists' preview renders, this output will be changed to a temp dir.
+    _TEMP_OUTPUT_PATH = "N:\\Blender\\TempRenders\\"
+
     _BLENDER_COMPOSITING_BACK_EXR_OUTPUT_NODE_NAME = "Back_EXR_Output"
     _BLENDER_COMPOSITING_ACTORS_EXR_OUTPUT_NODE_NAME = "Actors_EXR_Output"
     _BLENDER_COMPOSITING_UVS_EXR_OUTPUT_NODE_NAME = "UVs_EXR_Output"
@@ -70,6 +74,7 @@ class Rendering_Engine():
         print("\n=====================================================================================")
         print("VSE Render Automation")
 
+        self.handle_temp_output();
         self.log_inputs()
         self._setup_scene()
 
@@ -105,6 +110,15 @@ class Rendering_Engine():
         print("\n=====================================================================================")
         print ("\nRender processes completed successfully")    
 
+    def handle_temp_output(self):
+
+        if (os.path.exists(self._TEMP_OUTPUT_PATH)):
+            bpy.context.scene.render.filepath = self._TEMP_OUTPUT_PATH
+        else:
+            print("\n=====================================================================================")
+            print ("\nWARNING: Add a temporary directory to the N drive:" + self._TEMP_OUTPUT_PATH + " to avoid overwriting " +
+                   "the output file in the blend scene")
+            print("\n=====================================================================================")
 
     def log_inputs(self):
 
