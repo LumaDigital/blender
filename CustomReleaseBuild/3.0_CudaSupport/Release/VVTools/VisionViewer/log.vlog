@@ -1,0 +1,513 @@
+D:0 : 2022-11-11 12:33:10.724 Log Starting
+I:0 : 2022-11-11 12:33:10.724 VisionViewer Initializing version 1.27.0
+D:0 : 2022-11-11 12:33:10.724 Options: DemoFile='Demo\Random_6.cfg' DemoFirstEventSeconds=0
+D:0 : 2022-11-11 12:33:10.750 Initialized Video Engine
+D:MW: 2022-11-11 12:33:10.756 Window "Vision Viewer" Config:
+Config {
+	BasedOn="../MainWindow" Y=0 Width=1280 Height=720 Title="Vision Viewer" Windowed=0 Layered=1 WindowCode="MW" ServerCode="MS" ServerNeedsResults=0 ServerNotifyExternalViewer=1 ServerTrace=1 UnityTrace=1 
+	LogLevel=2 Debug=1 VSync=0 MaxFPS=30 ShowEvent=1 JackpotsDisplayHeight=42 IsQuadScreen=0 Enable_Video=1 Template="Generic" 
+	overlays {
+		Slide {
+			Template="ConnectionsOverlay" VisibleOnLoading=1 VisibleOnConnecting=1 VisibleOnNoMoreEvents=1 VisibleOnDetails=1 HorizontalAlign="Left" VerticalAlign="Bottom" 
+		}
+	}
+	handlers {
+		Archery {}
+		BasketballLeague {
+			EventType="BasketballLeagueWeek" AdditionalEventType="BasketballLeagueMatch" 
+		}
+		IceHockeyLeague {
+			EventType="IceHockeyLeagueRound" AdditionalEventType="IceHockeyLeagueMatch" 
+		}
+		IceHockeyAmericanLeague {
+			ClassType="IceHockeyLeague" EventType="IceHockeyAmericanLeagueRound" AdditionalEventType="IceHockeyAmericanLeagueMatch" StateNode="IceHockeyLeague" 
+		}
+		IceHockey {
+			ClassType="IceHockey" 
+		}
+		IceHockeyAmerican {
+			ClassType="IceHockey" StateNode="IceHockey" 
+		}
+		IceHockeyShootout {
+			EventType="IceHockeyShootoutRound" AdditionalEventType="IceHockeyShootoutMatch" 
+		}
+		PreRecFootballEnglish {
+			ClassType="PreRecFootball" StateNode="PreRecFootball" 
+		}
+		PreRecFootballEnglishLeague {
+			ClassType="PreRecFootballLeague" EventType="PreRecFootballEnglishLeagueRound" AdditionalEventType="PreRecFootballEnglishLeagueMatch" StateNode="PreRecFootballLeague" 
+		}
+		PreRecFootballItalian {
+			ClassType="PreRecFootball" StateNode="PreRecFootball" 
+		}
+		PreRecFootballItalianLeague {
+			ClassType="PreRecFootballLeague" EventType="PreRecFootballItalianLeagueRound" AdditionalEventType="PreRecFootballItalianLeagueMatch" StateNode="PreRecFootballLeague" 
+		}
+		VideoFootballEnglish {
+			ClassType="VideoFootball" StateNode="VideoFootball" 
+		}
+		VideoFootballSpanish {
+			ClassType="VideoFootball" StateNode="VideoFootball" 
+		}
+		VideoFootballItalian {
+			ClassType="VideoFootball" StateNode="VideoFootball" 
+		}
+		VideoFootballEnglishLeague {
+			ClassType="VideoFootballLeague" EventType="VideoFootballEnglishLeagueRound" AdditionalEventType="VideoFootballEnglishLeagueMatch" StateNode="VideoFootballLeague" 
+		}
+		VideoFootballSpanishLeague {
+			ClassType="VideoFootballLeague" EventType="VideoFootballSpanishLeagueRound" AdditionalEventType="VideoFootballSpanishLeagueMatch" StateNode="VideoFootballLeague" 
+		}
+		VideoFootballItalianLeague {
+			ClassType="VideoFootballLeague" EventType="VideoFootballItalianLeagueRound" AdditionalEventType="VideoFootballItalianLeagueMatch" StateNode="VideoFootballLeague" 
+		}
+		KenoFootballEnglish {
+			ClassType="VideoFootball" StateNode="KenoFootball" 
+		}
+		KenoFootballEnglishLeague {
+			ClassType="VideoFootballLeague" EventType="KenoFootballEnglishLeagueRound" AdditionalEventType="KenoFootballEnglishLeagueMatch" StateNode="KenoFootballLeague" 
+		}
+		GoalFootballEnglish {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballSpanish {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballItalian {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballEuro {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballGerman {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballFrench {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballChinese {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballChampions {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballGreek {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballTurkish {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballAmerican {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballWorld {
+			ClassType="VideoFootball" StateNode="GoalFootball" 
+		}
+		GoalFootballEnglishLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballEnglishLeagueRound" AdditionalEventType="GoalFootballEnglishLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballSpanishLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballSpanishLeagueRound" AdditionalEventType="GoalFootballSpanishLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballItalianLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballItalianLeagueRound" AdditionalEventType="GoalFootballItalianLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballEuroLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballEuroLeagueRound" AdditionalEventType="GoalFootballEuroLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballGermanLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballGermanLeagueRound" AdditionalEventType="GoalFootballGermanLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballFrenchLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballFrenchLeagueRound" AdditionalEventType="GoalFootballFrenchLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballChineseLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballChineseLeagueRound" AdditionalEventType="GoalFootballChineseLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballChampionsLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballChampionsLeagueRound" AdditionalEventType="GoalFootballChampionsLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballGreekLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballGreekLeagueRound" AdditionalEventType="GoalFootballGreekLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballTurkishLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballTurkishLeagueRound" AdditionalEventType="GoalFootballTurkishLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballAmericanLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballAmericanLeagueRound" AdditionalEventType="GoalFootballAmericanLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		GoalFootballWorldLeague {
+			ClassType="VideoFootballLeague" EventType="GoalFootballWorldLeagueRound" AdditionalEventType="GoalFootballWorldLeagueMatch" StateNode="GoalFootballLeague" 
+		}
+		PlatinumHounds {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		DashingDerby {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		HarnessRacing {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		CycleRacing {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		MotorRacing {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		SteepleChase {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		SingleSeaterMotorRacing {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		HorsesEqual {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		SpeedSkating {
+			ClassType="ViewerRacing" StateNode="Racing" 
+		}
+		LuckyHorses {
+			ClassType="ViewerRacing" StateNode="LuckyRacing" 
+		}
+		LuckyCars {
+			ClassType="ViewerRacing" StateNode="LuckyRacing" 
+		}
+		PreRecDogs {
+			ClassType="VideoRacing" StateNode="VideoRacing" 
+		}
+		PreRecRealDogs {
+			ClassType="VideoRacing" StateNode="VideoRacing" 
+		}
+		PreRecHorses {
+			ClassType="VideoRacing" StateNode="VideoRacing" 
+		}
+		PreRecSingleSeaterMotorRacing {
+			ClassType="VideoRacing" StateNode="VideoRacing" 
+		}
+		PreRecSlotCarRacing {
+			EventType="PreRecordedSlotCarRacing" ClassType="VideoRacing" StateNode="VideoRacing" 
+		}
+		HorseRacingRoulette {
+			ClassType="ViewerRacing" StateNode="RacingRoulette" 
+		}
+		PreRecHorseRacingRoulette {
+			ClassType="VideoRacing" StateNode="VideoRacingRoulette" 
+		}
+		Badminton {
+			ClassType="Tennis" StateNode="Tennis" 
+		}
+		TableTennis {
+			ClassType="Tennis" StateNode="Tennis" 
+		}
+		VsFootball {
+			EventType="Football" StateNode="VsFootball" 
+		}
+		VsFootballLeague {
+			EventType="FootballLeagueWeek" StateNode="VsFootballLeague" 
+		}
+		LuckyLoot624 {
+			ClassType="LuckyLoot" EventType="LuckyLoot624" StateNode="LuckyLoot624" 
+		}
+		Keno {}
+		SpinAndWin {}
+		PreRecBasketballNBALast60 {
+			ClassType="PreRecBasketball" StateNode="PreRecBasketball" 
+		}
+		VirtualBasketballNBALeague {
+			ClassType="VirtualBasketballLeague" EventType="VirtualBasketballNBALeagueRound" AdditionalEventType="VirtualBasketballNBALeagueMatch" StateNode="VirtualBasketballLeague" 
+		}
+		VirtualBasketballNBA {
+			ClassType="VirtualBasketball" StateNode="VirtualBasketball" 
+		}
+		CricketSuperOverNational {
+			ClassType="Cricket" StateNode="CricketSuperOver" 
+		}
+		CricketSuperOverIndian {
+			ClassType="Cricket" StateNode="CricketSuperOver" 
+		}
+		CricketFinalOverNational {
+			ClassType="Cricket" StateNode="CricketFinalOver" 
+		}
+		CricketFinalOverIndian {
+			ClassType="Cricket" StateNode="CricketFinalOver" 
+		}
+		GoalFootballWorld32Tournament {
+			ClassType="FootballTournament" EventType="GoalFootballWorld32Tournament" AdditionalEventType="GoalFootballTournamentWorld32Match" StateNode="GoalFootballTournament" 
+		}
+		SkillDashingDerby {
+			ClassType="ViewerRacing" StateNode="SkillRacing" EventType="SkillDashingDerby" 
+		}
+	}
+	MainWindow {
+		Windowed=0 Layered=1 WindowCode="MW" ServerCode="MS" Title="Vision Viewer" ServerNeedsResults=0 ServerNotifyExternalViewer=1 
+		overlays {
+			Slide {
+				Template="ConnectionsOverlay" VisibleOnLoading=1 VisibleOnConnecting=1 VisibleOnNoMoreEvents=1 VisibleOnDetails=1 HorizontalAlign="Left" VerticalAlign="Bottom" 
+			}
+		}
+		handlers {
+			Archery {}
+			BasketballLeague {
+				EventType="BasketballLeagueWeek" AdditionalEventType="BasketballLeagueMatch" 
+			}
+			IceHockeyLeague {
+				EventType="IceHockeyLeagueRound" AdditionalEventType="IceHockeyLeagueMatch" 
+			}
+			IceHockeyAmericanLeague {
+				ClassType="IceHockeyLeague" EventType="IceHockeyAmericanLeagueRound" AdditionalEventType="IceHockeyAmericanLeagueMatch" StateNode="IceHockeyLeague" 
+			}
+			IceHockey {
+				ClassType="IceHockey" 
+			}
+			IceHockeyAmerican {
+				ClassType="IceHockey" StateNode="IceHockey" 
+			}
+			IceHockeyShootout {
+				EventType="IceHockeyShootoutRound" AdditionalEventType="IceHockeyShootoutMatch" 
+			}
+			PreRecFootballEnglish {
+				ClassType="PreRecFootball" StateNode="PreRecFootball" 
+			}
+			PreRecFootballEnglishLeague {
+				ClassType="PreRecFootballLeague" EventType="PreRecFootballEnglishLeagueRound" AdditionalEventType="PreRecFootballEnglishLeagueMatch" StateNode="PreRecFootballLeague" 
+			}
+			PreRecFootballItalian {
+				ClassType="PreRecFootball" StateNode="PreRecFootball" 
+			}
+			PreRecFootballItalianLeague {
+				ClassType="PreRecFootballLeague" EventType="PreRecFootballItalianLeagueRound" AdditionalEventType="PreRecFootballItalianLeagueMatch" StateNode="PreRecFootballLeague" 
+			}
+			VideoFootballEnglish {
+				ClassType="VideoFootball" StateNode="VideoFootball" 
+			}
+			VideoFootballSpanish {
+				ClassType="VideoFootball" StateNode="VideoFootball" 
+			}
+			VideoFootballItalian {
+				ClassType="VideoFootball" StateNode="VideoFootball" 
+			}
+			VideoFootballEnglishLeague {
+				ClassType="VideoFootballLeague" EventType="VideoFootballEnglishLeagueRound" AdditionalEventType="VideoFootballEnglishLeagueMatch" StateNode="VideoFootballLeague" 
+			}
+			VideoFootballSpanishLeague {
+				ClassType="VideoFootballLeague" EventType="VideoFootballSpanishLeagueRound" AdditionalEventType="VideoFootballSpanishLeagueMatch" StateNode="VideoFootballLeague" 
+			}
+			VideoFootballItalianLeague {
+				ClassType="VideoFootballLeague" EventType="VideoFootballItalianLeagueRound" AdditionalEventType="VideoFootballItalianLeagueMatch" StateNode="VideoFootballLeague" 
+			}
+			KenoFootballEnglish {
+				ClassType="VideoFootball" StateNode="KenoFootball" 
+			}
+			KenoFootballEnglishLeague {
+				ClassType="VideoFootballLeague" EventType="KenoFootballEnglishLeagueRound" AdditionalEventType="KenoFootballEnglishLeagueMatch" StateNode="KenoFootballLeague" 
+			}
+			GoalFootballEnglish {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballSpanish {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballItalian {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballEuro {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballGerman {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballFrench {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballChinese {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballChampions {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballGreek {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballTurkish {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballAmerican {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballWorld {
+				ClassType="VideoFootball" StateNode="GoalFootball" 
+			}
+			GoalFootballEnglishLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballEnglishLeagueRound" AdditionalEventType="GoalFootballEnglishLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballSpanishLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballSpanishLeagueRound" AdditionalEventType="GoalFootballSpanishLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballItalianLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballItalianLeagueRound" AdditionalEventType="GoalFootballItalianLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballEuroLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballEuroLeagueRound" AdditionalEventType="GoalFootballEuroLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballGermanLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballGermanLeagueRound" AdditionalEventType="GoalFootballGermanLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballFrenchLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballFrenchLeagueRound" AdditionalEventType="GoalFootballFrenchLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballChineseLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballChineseLeagueRound" AdditionalEventType="GoalFootballChineseLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballChampionsLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballChampionsLeagueRound" AdditionalEventType="GoalFootballChampionsLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballGreekLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballGreekLeagueRound" AdditionalEventType="GoalFootballGreekLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballTurkishLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballTurkishLeagueRound" AdditionalEventType="GoalFootballTurkishLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballAmericanLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballAmericanLeagueRound" AdditionalEventType="GoalFootballAmericanLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			GoalFootballWorldLeague {
+				ClassType="VideoFootballLeague" EventType="GoalFootballWorldLeagueRound" AdditionalEventType="GoalFootballWorldLeagueMatch" StateNode="GoalFootballLeague" 
+			}
+			PlatinumHounds {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			DashingDerby {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			HarnessRacing {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			CycleRacing {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			MotorRacing {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			SteepleChase {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			SingleSeaterMotorRacing {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			HorsesEqual {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			SpeedSkating {
+				ClassType="ViewerRacing" StateNode="Racing" 
+			}
+			LuckyHorses {
+				ClassType="ViewerRacing" StateNode="LuckyRacing" 
+			}
+			LuckyCars {
+				ClassType="ViewerRacing" StateNode="LuckyRacing" 
+			}
+			PreRecDogs {
+				ClassType="VideoRacing" StateNode="VideoRacing" 
+			}
+			PreRecRealDogs {
+				ClassType="VideoRacing" StateNode="VideoRacing" 
+			}
+			PreRecHorses {
+				ClassType="VideoRacing" StateNode="VideoRacing" 
+			}
+			PreRecSingleSeaterMotorRacing {
+				ClassType="VideoRacing" StateNode="VideoRacing" 
+			}
+			PreRecSlotCarRacing {
+				EventType="PreRecordedSlotCarRacing" ClassType="VideoRacing" StateNode="VideoRacing" 
+			}
+			HorseRacingRoulette {
+				ClassType="ViewerRacing" StateNode="RacingRoulette" 
+			}
+			PreRecHorseRacingRoulette {
+				ClassType="VideoRacing" StateNode="VideoRacingRoulette" 
+			}
+			Badminton {
+				ClassType="Tennis" StateNode="Tennis" 
+			}
+			TableTennis {
+				ClassType="Tennis" StateNode="Tennis" 
+			}
+			VsFootball {
+				EventType="Football" StateNode="VsFootball" 
+			}
+			VsFootballLeague {
+				EventType="FootballLeagueWeek" StateNode="VsFootballLeague" 
+			}
+			LuckyLoot624 {
+				ClassType="LuckyLoot" EventType="LuckyLoot624" StateNode="LuckyLoot624" 
+			}
+			Keno {}
+			SpinAndWin {}
+			PreRecBasketballNBALast60 {
+				ClassType="PreRecBasketball" StateNode="PreRecBasketball" 
+			}
+			VirtualBasketballNBALeague {
+				ClassType="VirtualBasketballLeague" EventType="VirtualBasketballNBALeagueRound" AdditionalEventType="VirtualBasketballNBALeagueMatch" StateNode="VirtualBasketballLeague" 
+			}
+			VirtualBasketballNBA {
+				ClassType="VirtualBasketball" StateNode="VirtualBasketball" 
+			}
+			CricketSuperOverNational {
+				ClassType="Cricket" StateNode="CricketSuperOver" 
+			}
+			CricketSuperOverIndian {
+				ClassType="Cricket" StateNode="CricketSuperOver" 
+			}
+			CricketFinalOverNational {
+				ClassType="Cricket" StateNode="CricketFinalOver" 
+			}
+			CricketFinalOverIndian {
+				ClassType="Cricket" StateNode="CricketFinalOver" 
+			}
+			GoalFootballWorld32Tournament {
+				ClassType="FootballTournament" EventType="GoalFootballWorld32Tournament" AdditionalEventType="GoalFootballTournamentWorld32Match" StateNode="GoalFootballTournament" 
+			}
+			SkillDashingDerby {
+				ClassType="ViewerRacing" StateNode="SkillRacing" EventType="SkillDashingDerby" 
+			}
+		}
+	}
+	CricketSuperOver {
+		Slides {
+			Countdown {
+			}
+			Game {
+			}
+			Results {
+				AllowPreloadAfter=2 
+			}
+		}
+		PreviewSlide {}
+	}
+}
+
+D:MW: 2022-11-11 12:33:10.863 GL Version: 4.6.0 NVIDIA 511.79
+D:MW: 2022-11-11 12:33:10.864 GL Version 4.6
+D:MW: 2022-11-11 12:33:11.041 Initialized Window Graphics: Vision Viewer
+D:MW: 2022-11-11 12:33:11.041 Initialized Window: Vision Viewer
+D:MW: 2022-11-11 12:33:11.051 Initialized Video Engine for Window: Vision Viewer 1280x720
+D:MW: 2022-11-11 12:33:11.085 Screen 1 supported event types: *
+D:MW: 2022-11-11 12:33:11.326 IO released 540916 cached file bytes
+D:MW: 2022-11-11 12:33:11.327 Enter Connect Slide
+D:MW: 2022-11-11 12:33:11.338 Queue Event ID=1 Game="12345" EventTime=12:33
+D:MW: 2022-11-11 12:33:11.338 Enter Display Slide
+I:MW: 2022-11-11 12:33:14.889 VisionViewer Uninitializing
+D:MW: 2022-11-11 12:33:14.889 Uninitialize Audio Engine
+D:MW: 2022-11-11 12:33:14.891 Delete Windows
+D:MW: 2022-11-11 12:33:14.903 Uninitialized Video Engine for Window: Vision Viewer
+D:MW: 2022-11-11 12:33:14.904 Uninitialized Window Graphics: Vision Viewer
+D:MW: 2022-11-11 12:33:14.904 Uninitialized Window: Vision Viewer
+D:MW: 2022-11-11 12:33:14.905 Uninitialize Gl Context
+D:MW: 2022-11-11 12:33:14.937 Delete Config
+D:MW: 2022-11-11 12:33:14.937 Uninitialize IO
+D:MW: 2022-11-11 12:33:14.937 Uninitialize RealtimeDataCache
+D:MW: 2022-11-11 12:33:14.937 Uninitialize Handler Factories
+D:MW: 2022-11-11 12:33:14.937 Uninitialize Server Factories
+D:MW: 2022-11-11 12:33:14.937 Uninitialize Overlays
+D:MW: 2022-11-11 12:33:14.937 Uninitialize Completed

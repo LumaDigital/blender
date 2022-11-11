@@ -1,0 +1,521 @@
+Vision Viewer Configuration guide
+
+The viewer is configured by specifying a series of Commands and Options on the command line. A Command is specified
+using a single identifier (command name) while an Option consists of an identifier (option name) followed by an
+equals ("=") and a value. Commands are preferred over Options as they are simpler to specify and often provide more complex
+behaviour.
+
+Example Command: Debug
+	Specifying "Debug" on the command line, causes a series of options to be set
+
+Example Option: LogLevel=0
+	Specifying "LogLevel=0" on the command line, causes the option called "LogLevel" to be set to a value of 0
+
+	Depending on the environment, options may need to be surrounded using double or single quotes. Especially so if the option value
+	contains spaces.
+
+Option values accept one of the following:
+	boolean : A text string, either the value "true" or "false" - The quotes shown here must be left out when specifying the value.
+	integer : A number with no fractional digits or .
+	number : A number with (float) or without (integer) fractional digits. The decimal separator is a . (decimal point)
+	string : A line of text enclosed in double quotes
+
+------------------------------------------------------------------------------------------------------------------------
+Resolution Commands:
+	HD : [Default] 1280x720
+	SD : 720x576 (PAL)
+	FullHD : 1920x1080
+	Windowed : 1280x720 in a window
+	HD0 : Top left quarter 640x480
+	HD1 : Top right quarter 640x480
+	HD2 : Bottom left quarter 640x480
+	HD3 : Bottom right quarter 640x480
+	HD4 : 4 quarter windows
+	SlideWindowFullHD : 1920x1080 - Slide Window defaults to HD (1280x720)
+	CustomResolution Width=number Height=number : Set custom resolution by Width X Height
+
+Speed Commands:
+	Vsync : [Default] Soft Vsync and capped to 60
+	Max60 : Capped to 60
+	Max50 : Capped to 50
+	Max30 : Capped to 30
+	Max25 : Capped to 25
+	Max20 : Capped to 20
+	Max : No cap or vsync, runs at maximum frame rate. For testing purposes only
+	FullVsync : Hardware Vsync to monitor refresh rate
+	HalfVsync : Hardware Vsync to half of monitor refresh rate and capped to 30 (May not work on all hardware. Works on nVidia/Intel)
+	SlideWindowVsync, SlideWindowMax60, SlideWindowMax50, SlideWindowMax30, SlideWindowMax25, SlideWindowMax20, SlideWindowMax, SlideWindowFullVsync, SlideWindowHalfVsync : Same as above but overrides setting for SlideWindow
+
+Window Commands:
+	SlideWindow : Shows the Main Window and the Slide Window
+	SlideWindowOnly : Shows the SlideWindow only
+
+Game Commands:
+	Racing, VideoRacing, RacingRoulette, Tennis, Archery, VsFootball, VsFootballLeague, SpinAndWin, Keno, IceHockeyLeague, PreRecFootball, PreRecFootballLeague, LuckyLoot624, LottoRacing, BasketballLeague, IceHockeyShootout, VideoRacingRoulette, VideoFootball, VideoFootballLeague, KenoFootball, KenoFootballLeague, PreRecRealDogs, GoalFootball, GoalFootballLeague, PreRecBasketball, VirtualBasketballLeague, IceHockey, VirtualBasketball
+
+Demo Commands:
+	DemoDashingDerby, DemoPlatinumHounds, DemoHarnessRacing, DemoCycleRacing, DemoMotorRacing, DemoSteepleChase, DemoHorseRacingRoulette, DemoHorsesEqual, DemoSpeedSkating
+	DemoPreRecHorses, DemoPreRecDogs, DemoPreRecSingleSeaterMotorRacing, DemoPreRecFootballEnglish, DemoPreRecFootballItalian, DemoPreRecFootballEnglishLeague, DemoPreRecFootballItalianLeague
+	DemoTableTennis, DemoBadminton, DemoArchery, DemoFootball, DemoSingleSeaterMotorRacing, DemoFootballLeague, DemoSpinAndWin, DemoKeno, DemoIceHockeyLeague, DemoLuckyLoot624, DemoLottoHorses, DemoLottoCars
+
+Diagnostic Commands:
+	UniqueLog : Uses a new log file name every time the viewer starts up. The name includes the date and time
+	ServerTrace : Turns on detailed server connection logging (Remember to set LogLevel=2)
+	UnityTrace : Turns on detailed logging of interaction with 3d viewer (Remember to set LogLevel=2)
+	ServerStats : Turns on an overlay showing the server connection statistics
+	SimulateNoResult : Simulates not receiving a result on an event. Works in demo and server mode
+	SimulateEventRemoval : Simulates deleting the first event from the event card 5s after startup
+	SimulateEventRemovalAll : Simulates deleting all events from the event card after SimulateEventDelay seconds
+	SimulateEventDelay : Number of seconds from startup to wait before simulating the Event Removal. The default is 5
+	SimulateEventDuration : Number of seconds the removing all events will be applied for. The default is 5
+	SimulateEventRepeatAfter : Number of seconds after the event removal started to repeat the simulation. The default is 10
+	DemoSimulateEndOfDay : Shows a single event. Used to test what happens after the last event of the day
+	DebugLog : Turns on debug logging
+	Debug : Turns on debug logging, ServerTrace and UnityTrace
+	NoTopMost : Turns off Top Most window mode
+	NoHost : Turns on a mode where external viewers do not become hosted by Vision (Equivalent to LayeredMode=0)
+	NoViewerStartup : Turns off waiting for external viewers to start up (Equivalent to WaitForViewerStartup=false)
+	ShowMouse : Turns on the mouse pointer (Equivalent to MouseHidden=false)
+	NoShow : Turns off the game animation for all event types (Equivalent to setting [EventType]_ShowEvent=false)
+	CustomDemoPreviousResults : Uses DemoPreviousResults.cfg file to override previous results specified in the GenericResources.cfg (DemoPreviousResults.cfg is situated in the root VisionViewer directory)
+	DemoJackpotUpdate=true/false[Default] : Enable internal updates to the JackpotV2 data for testing without a server. Only works when Demo is on
+
+Diagnostic Options:
+	ServerTraceFlags=list : A comma delimited list of the following: Coms,Events,EventIDs,Results,RealtimeData,Timing
+	StressTestServerInstances=integer : Sets the number of server connections to create. Default is 0 which means only one
+	LogLevel=integer : Sets logging to one of: 0=no logging; 1=info logging; 2=debug logging. Prefer using Debug or DebugLog commands
+	DashingDerby_ShowEvent=true[Default]/false : Used to skip the game animation and go directly to the result
+	PlatinumHounds_ShowEvent=true[Default]/false : Used to skip the game animation and go directly to the result
+	[EventType]_ShowEvent=true[Default]/false : Used to skip the game animation and go directly to the result
+	DemoFirstEventSeconds=integer : Sets the number of seconds until the first demo event runs. The default is 60
+	DemoNextEventSeconds=integer : Sets the number of seconds between demo events. The default is 180
+	DemoEventDuration=integer : Sets the artificial duration given to a demo event. The default is 160
+	LogSharedDataNodes=true/false[Default] : Logs SharedDataNode allocations
+	DemoFile1=string : Filename for an additional demo file. Demo events are interleaved
+	DemoFile2=string : Filename for an additional demo file. Demo events are interleaved
+	DemoFile3=string : Filename for an additional demo file. Demo events are interleaved
+	DemoFile4=string : Filename for an additional demo file. Demo events are interleaved
+	
+General Options:
+	SlideWindowX : Overrides the X position for the Slide Window. This can be set to 0 for testing SlideWindowOnly. The default X position depends on the the Main Window's size
+	Server=string : Sets the IP address of the server to connect to. Example "127.0.0.1" will connect to the local computer
+	Channels=string : Sets the channels to retrieve from the GS. This is a string like "A" or "ABC"
+	ConnectingText=string : Overrides the "CONNECTING" text string specified in the language file
+	NoMoreEventsTitle=string : Overrides the "NO MORE EVENTS" text string specified in the language file
+	NoMoreEventsDetail=string : Overrides the "EVENTS HAPPEN..." text string specified in the language file
+	ShowLogo=true[Default]/false : Displays or hides the header company logo
+	ShowEventTime=true[Default]/false : Displays or hides the header event time
+	ShowEventNumber=true[Default]/false : Displays or hides the header event number
+	ShowEventName=true[Default]/false : Displays or hides the header event name
+	ShowPreviousResults=true[Default]/false : Displays or hides the previous results display
+	CloseBettingOffset=integer : The number of seconds before the event time that the countdown counts to
+	ResultsDuration=number : Sets the number of seconds to stay on the result. The default is 10.0
+	DecimalSeparator=string : Sets the separator used for displaying decimal fractions. The default is "."
+	ThousandsSeparator=string : Sets the separator used for splitting numbers at 1000s. The default is ","
+	AmFormat=string : Sets the text appended to a 12 hour time. The default is " AM"
+	PmFormat=string : Sets the text appended to a 12 hour time. The default is " PM"
+	CurrencySymbol=string : Sets the text used for displaying a currency symbol. The default is "" which shows no symbol
+	SafeMarginH : Sets the horizontal size of the screen safe margin based on 1280x720. The default is 70
+	              Changing SafeMarginH may have undesirable effects as slides are designed to work right at 70. Use with caution.
+	SafeMarginV : Sets the vertical size of the screen safe margin based on 1280x720. The default is 60
+	              Changing SafeMarginV may have undesirable effects as slides are designed to work right at 60. Use with caution.
+	ShowSlideWindowEventTime=true[Default]/false : Displays or hides the event times on the Slide Window
+	AudioDevice=integer : Sets the audio device to use. First device is 0. Default is -1 which uses the default audio device.
+	DateTimeOffset=integer : Sets the time offset in milliseconds. A negative value is the same as moving the system clock backwards. Default is 0.
+	EnableAdverts : Used to enable advert feature
+
+Preview Options:
+	PreviewMode=true[Default]/false : Enables or disables previews for upcoming events
+	PreviewDuration=number : Sets the default duration (seconds) used for each event preview. The default is 20.0
+	PreviewEvents=integer : Sets the number of upcoming events to preview on the countdown slide (between 1 and 5). The default is 4
+	ResultPreviewEvents=integer : Sets the number of upcoming events to preview on result slides. The default is 1
+
+QuadScreen Options:
+	QuadScreen : Turns on Quad Screen mode. Screen 1 is top left. Screen 2 is top right. Screen 3 is bottom left. Screen 4 is bottom right
+	ScreenXEventTypes=string : Comma separated list of event types that can be shown on screen X. Replace X with a value between 1 and 4
+	ScreenXAudio=true/false[Default] : Enables sound for screen X. Replace X with a value between 1 and 4
+
+Jackpot Options:
+	EnableJackpots=true/false[Default] : Enables the jackpots display
+	ShowInGameJackpots=true/false[Default] : Enables the jackpots display during the game animation
+	ShowResultsJackpots=true/false[Default] : Enables the jackpots display on the results screen
+	JackpotWinnerDuration=number : Sets the number of seconds that the current winner gets displayed at the beginning of event details. The default is 10.0
+	JackpotNameFontFileName=string : Internal setting to override the default font used for the jackpot name
+	JackpotTextFontFileName=string : Internal setting to override the default font used for the jackpot text
+	JackpotAmountFontFileName=string : Internal setting to override the default font used for the jackpot amount
+	JackpotV2 : Command turns on the V2 jackpot feature. This is required in addition to EnableJackpots=true
+	ViewerID=string : Specifies an optional string to be prepended to jackpot Source names
+	JackpotCurrencySymbols=string : Sets the characters used for displaying a currency symbol. The default is "$"
+
+Racing Options:
+	MarketPageDuration=number : Overrides the default number of seconds to display each market page. The default is 10.0
+	HasRaceMarket=true[Default]/false : Used to enable the "old" slide where the combination odds displayed is related to the horse in the parade
+	RacingShowEventType=true/false[Default] : Displays or hides the header event type
+	RacingShowEventTypeAsEventName=false[Default]/true : Displays the event type in place of the event name
+	RacingResultsDuration=number : Overrides the number of seconds to show the racing results slide
+	RacingPreviewDuration=number : Overrides the preview's duration (seconds) while showing a racing event
+	RacingPreviewEvents=integer : Overrides the number of preview events shown while showing racing event details (0 disables previews)
+	RacingResultPreviewEvents=integer : Overrides the number of preview events shown while showing a racing result (0 disables previews)
+	RacingHorseSilkByDraw=true/false[Default] : Specifies whether horse silks are ordered by ID (the default) or by Draw
+	RacingNoPlace : If specified, Place bets will be removed
+	RacingNoExacta : If specified, Exacta bets are removed
+	RacingNoTrifecta : If specified, Trifecta bets are removed
+	RacingNoQuinella : If specified, Quinella bets are removed
+	RacingNoTrio : If specified, Trio bets are removed
+	RacingNoSwinger: If specified, Swinger bets are removed
+	RacingNoHiLo: If specified, High/Low bets are removed
+	RacingNoOddEven: If specified, Odds/Evens bets are removed
+	RacingHasQuartet: If specified, Quartet bets are added
+	FourRaceFinishers : Shows top 4 finishers in racing replays, in racing results and racing tickers.  3 finishers are the default if not specified. This option will only work on viewers below version 1.9
+	RaceParadeFrames=integer : Overrides the number of frames to hold on each participant. The default is 240 (4 seconds)
+	Enable_DashingDerby=true[Default]/false : Used to disable DashingDerby
+	Enable_PlatinumHounds=true[Default]/false : Used to disable PlatinumHounds
+	Enable_HarnessRacing=true[Default]/false : Used to disable HarnessRacing
+	Enable_CycleRacing=true[Default]/false : Used to disable CycleRacing
+	Enable_MotorRacing=true[Default]/false : Used to disable MotorRacing
+	Enable_SteepleChase=true[Default]/false : Used to disable SteepleChase
+	Enable_HorsesEqual=true[Default]/false : Used to disable HorsesEqual
+	Enable_SpeedSkating=true[Default]/false : Used to disable SpeedSkating
+	Enable_PreRecBasketballNBALast60=true[default]/false : Used to disable PreRecBasketball 
+	Enable_VirtualBasketballNBA=true[Default]/false : Used to disable virtual basketball
+	Enable_VirtualBasketballNBALeague=true[Default]/false : Used to disable VirtualBasketballLeague
+	ShowSixPositions=false[Default]/true : Used to display 6 racing positions only (In-Game) - bigger font and silk images (Horses only - retail and online)
+	RacingRaceFinishers=number : Overrides the default number of finishers to "highlight" on the in-game slide and display on the replay slide. The default is 3. The supported range is 3-4. This option replaces the old option 		"FourRaceFinishers" starting from vision version 1.9
+	DDBackgroundColor=Color(R,G,B) : Overrides the color of the DashingDerby background
+	DDHeadingColor=Color(R,G,B) : Overrides the color of the DashingDerby headings (Slides and Slide Viewer)
+	PHBackgroundColor=Color(R,G,B) : Overrides the color of the PlatinumHounds background
+	PHHeadingColor=Color(R,G,B) : Overrides the color of the PlatinumHounds headings (Slides and Slide Viewer)
+	LookupXXX : Turns on lookup filename for race type XXX. Names are mapped from runner ID and track ID
+
+VideoRacing Options:
+	MarketPageDuration=number : Overrides the default number of seconds to display each market page. The default is 10.0
+	HasRaceMarket=true[Default]/false : Used to enable the "old" slide where the combination odds displayed is related to the horse in the parade
+	RacingShowEventType=true/false[Default] : Displays or hides the header event type
+	RacingShowEventTypeAsEventName=false[Default]/true : Displays the event type in place of the event name
+	RacingResultsDuration=number : Overrides the number of seconds to show the racing results slide
+	RacingPreviewDuration=number : Overrides the preview's duration (seconds) while showing a racing event
+	RacingPreviewEvents=integer : Overrides the number of preview events shown while showing racing event details (0 disables previews)
+	RacingResultPreviewEvents=integer : Overrides the number of preview events shown while showing a racing result (0 disables previews)
+	RacingNoPlace : If specified, Place bets will be removed
+	RacingNoExacta : If specified, Exacta bets are removed
+	RacingNoTrifecta : If specified, Trifecta bets are removed
+	RacingNoQuinella : If specified, Quinella bets are removed
+	RacingNoTrio : If specified, Trio bets are removed
+	RacingNoSwinger: If specified, Swinger bets are removed
+	RacingNoHiLo: If specified, High/Low bets are removed
+	RacingNoOddEven: If specified, Odds/Evens bets are removed
+	RacingHasQuartet: If specified, Quartet bets are added
+	FourRaceFinishers : Shows top 4 finishers in racing replays, in racing results and racing tickers.  3 finishers are the default if not specified. This option will only work on viewers below version 1.9
+	RaceParadeFrames=integer : Overrides the number of frames to hold on each participant. The default is 240 (4 seconds)
+	Enable_PreRecHorses=true[Default]/false : Used to disable prerecorded horses
+	Enable_PreRecDogs=true[Default]/false : Used to disable prerecorded dogs
+	Enable_PreRecSingleSeaterMotorRacing=true[Default]/false : Used to disable prerecorded MotorRacing
+	Enable_PreRecRealDogs=true[Default]/false : Used to disable pre-recorded real dogs
+	Enable_PreRecSlotCarRacing=true[Default]/false : Used to disable pre-recorded slot cars
+	ShowSixPositions=false[Default]/true : Used to display 6 racing positions only (In-Game) - bigger font and silk images
+	RacingRaceFinishers=number : Overrides the default number of finishers to "highlight" on the in-game slide and display on the replay slide. The default is 3. The supported range is 3-4. This option replaces the old option 				"FourRaceFinishers" starting from vision version 1.9
+	LookupXXX : Turns on lookup filename for race type XXX. Names are mapped from runner ID and track ID
+
+RacingRoulette Options:
+	RacingRouletteShowEventType=true/false[Default] : Displays or hides the header event type
+	RacingRouletteShowEventTypeAsEventName=false[Default]/true : Displays the event type in place of the event name
+	RacingRouletteResultsDuration=number : Overrides the number of seconds to show the racing results slide
+	RacingRoulettePreviewDuration=number : Overrides the preview's duration (seconds) while showing a racing event
+	RacingRoulettePreviewEvents=integer : Overrides the number of preview events shown while showing racing event details (0 disables previews)
+	RacingRouletteResultPreviewEvents=integer : Overrides the number of preview events shown while showing a racing result (0 disables previews)
+	RacingRouletteHistoryTime=true/false[Default] : Specifies whether the history panel shows the game number or game time
+	Enable_HorseRacingRoulette=true[Default]/false : Used to disable HorseRacingRoulette
+	RacingRouletteType=1[Default]/2 : Used to change colours assigned to numbers. {Default set: 0:G;1:R;2:B;3:R;4:R;5:B;6:B;7:B;8:R;9:R;10:B;11:B;12:R} {Second set: 0:G;1:R;2:B;3:R;4:B;5:R;6:B;7:R;8:B;9:R;10:B;11:B;12:R}
+					  For PreRecHorseRacingRoulette the default option is the set number 2 - SolSystems colours.
+
+Football Options:
+	FootballResultsDuration=number : Overrides the number of seconds to show the football results slide
+	FootballPreviewDuration=number : Overrides the preview's duration (seconds) while showing a football event
+	FootballPreviewEvents=integer : Overrides the number of preview events shown while showing football event details (0 disables previews)
+	FootballResultPreviewEvents=integer : Overrides the number of preview events shown while showing a football result (0 disables previews)
+	FootballShowDebug=true/false[Default] : Shows a debug string with the current football slide state in the top left of the window
+	FootballHideNoGoal : Specify this command to hide the 0 goals odds for all bet types
+	Enable_VsFootball=true[Default]/false : Used to disable Football
+
+Football League Options:
+	FootballResultsDuration=number : Overrides the number of seconds to show the football results slide
+	FootballPreviewDuration=number : Overrides the preview's duration (seconds) while showing a football event
+	FootballPreviewEvents=integer : Overrides the number of preview events shown while showing football event details (0 disables previews)
+	FootballResultPreviewEvents=integer : Overrides the number of preview events shown while showing a football result (0 disables previews)
+	FootballShowDebug=true/false[Default] : Shows a debug string with the current football slide state in the top left of the window
+	Enable_VsFootballLeague=true[Default]/false : Used to disable Football League
+
+Tennis Options:
+	TennisShowEventType=true/false[Default] : Displays or hides the header event type
+	TennisResultsDuration=number : Overrides the number of seconds to show the tennis results slide
+	TennisPreviewDuration=number : Overrides the preview's duration (seconds) while showing a tennis event
+	TennisPreviewEvents=integer : Overrides the number of preview events shown while showing tennis event details (0 disables previews)
+	TennisResultPreviewEvents=integer : Overrides the number of preview events shown while showing a tennis result (0 disables previews)
+	TennisAmbienceVolume=number : Sets the ambience audio volume. The value should be from 0.0 (off) to 1.0 (max). The default is 0.15
+	TennisCheersVolume=number : Sets the cheering audio volume. The value should be from 0.0 (off) to 1.0 (max). The default is 0.15
+	TableTennis_EnableAudio=true[Default]/false : Enables or disables audio specifically for Tennis
+	Badminton_EnableAudio=true[Default]/false : Enables or disables audio specifically for Badminton
+	Enable_TableTennis=true[Default]/false : Used to disable TableTennis
+	Enable_Badminton=true[Default]/false : Used to disable Badminton
+	LookupXXX : Turns on lookup filename for tennis type XXX. Names are mapped from player ID
+
+Archery Options:
+	ArcheryShowEventType=true/false[Default] : Displays or hides the header event type
+	ArcheryResultsDuration=number : Overrides the number of seconds to show the archery results slide
+	ArcheryPreviewDuration=number : Overrides the preview's duration (seconds) while showing an archery event
+	ArcheryPreviewEvents=integer : Overrides the number of preview events shown while showing archery event details (0 disables previews)
+	ArcheryResultPreviewEvents=integer : Overrides the number of preview events shown while showing an archery result (0 disables previews)
+	ArcheryCheersVolume=number : Sets the cheering audio volume. The value should be from 0.0 (off) to 1.0 (max). The default is 0.15
+	ArcheryImpactVolume=number : Sets the audio volume of the impact of an arrow with the target. The default is 0.5
+	Archery_EnableAudio=true[Default]/false : Enables or disables audio specifically for Archery
+	Enable_Archery=true[Default]/false : Used to disable Archery
+	LookupXXX : Turns on lookup filename for archery type XXX. Names are mapped from player ID
+
+Keno Options:
+	KenoSimulateNoBalls=false[Default]/true : Used to test the Failure screen by preventing draw numbers from being received
+	KenoCustomPayTable : When specified as an argument, KenoPaytable.cfg will be loaded from the root VisionViewer EXE directory
+	KenoDualView : Specifies that the viewer is run as part of a dual-view Keno setup. It will be the primary screen if "KenoResults" is not specified.
+	KenoResults : To be used in conjunction with "KenoDualView". Specifies that the viewer is run as the secondary results history screen of a dual-view Keno setup.
+	KenoCameraStream : Used to hide the draw device animation during a draw, in order to allow the video stream of physical device to be visible.
+	KenoCustomInstructions : Used in Romanian/Spanish versions to replace generic instructions pages with the instructions in the Config/KenoCustomInstructions.cfg
+	KenoFlyInFrames=integer : Overrides the number of frames for the ball to fly into the machine. The Default is 20
+	KenoFlyOutFrames=integer : Overrides the number of frames for the ball to fly out of the machine. The Default is 10
+	KenoBallPauseFrames=integer : Overrides the number of frames to display the ball. The Default is 90.
+	Enable_Keno=true[Default]/false : Used to disable keno
+
+	Preamble pages options:
+	KenoShowJackpotsPage=true[Default]/true : Used to hide the 1st page (with Jackpots payouts)
+	KenoShowInstructions1=true[Default]/true : Used to hide the Instructions page 1 ("20 Balls drawn from 80")
+	KenoShowInstructions2=true[Default]/true : Used to hide the Instructions page 2 ("Play the Pick 10 game..")
+	KenoShowInstructions2=true[Default]/true : Used to hide the Instructions page 3 ("Pick3 to Pick10 games have multiple pay levels..")
+	KenoShowPickPages=true[Default]/true : Used to hide the payouts pages for Pick 10 to 1
+	KenoShowRecentWinnersPage=true[Default]/true : Used to hide the Recent Winnings page
+	KenoShowInstructions4=true[Default]/true : Used to hide the Instructions page 4 ("Pick 1 to 10 numbers from 80")
+
+SpinAndWin Options:
+	SpinAndWinRotations=number : Overrides the number of full rotations for each spin. The default is 5
+	SpinAndWinRotationDuration=number : Overrides the number of seconds to rotate the wheel. The default is 20s
+	SpinAndWinResultsDuration=number : Overrides the number of seconds to show the results slide
+	SpinAndWinHidePayTable : If specified, hides the Pay Table
+	SpinAndWinSupportLevels=true[Default]/false : Used to turn off support for displaying bet volume levels on the wheel
+	SpinAndWinBackground=1[Default]/2 : Used to specify either the wood or felt background
+	Enable_SpinAndWin=true[Default]/false : Used to disable SpinAndWin
+
+BasketballLeague Options:
+	BasketballLeagueResultsDuration=number : Overrides the number of seconds to show the basketball league results slide
+	Enable_BasketballLeague=true[Default]/false : Used to disable Basketball League
+	BasketballLeaguePage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	BasketballLeaguePage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	BasketballLeagueResultsPage1Duration=number : Overrides the default number of seconds to display odds Results Page 1. The default is 10
+	BasketballLeagueResultsPage2Duration=number : Overrides the default number of seconds to display odds Results Page 2. The default is 10
+
+IceHockey Options:
+	IceHockeyResultsDuration=number : Overrides the number of seconds to show the ice hockey results slide
+	Enable_IceHockey=true[Default]/false : Used to disable ice hockey 
+
+IceHockeyLeague Options:
+	IceHockeyLeagueResultsDuration=number : Overrides the number of seconds to show the ice hockey league results slide
+	Enable_IceHockeyLeague=true[Default]/false : Used to disable ice hockey league
+
+IceHockeyShootout Options:
+	IceHockeyShootoutResultsDuration=number : Overrides the number of seconds to show the ice hockey shootout results slide
+	Enable_IceHockeyShootout=true[Default]/false : Used to disable ice hockey shootout
+
+PreRecFootballLeague Options:
+	PreRecFootballLeagueResultsDuration=number : Overrides the number of seconds to show the football results slide
+	PreRecFootballLeaguePage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	PreRecFootballLeaguePage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	PreRecFootballLeaguePage3Duration=number : Overrides the default number of seconds to display odds Page 3. The default is 10
+	PreRecFootballLeaguePage4Duration=number : Overrides the default number of seconds to display odds Page 4. The default is 10
+	PreRecFootballLeaguePage5Duration=number : Overrides the default number of seconds to display odds Page 5. The default is 10
+	PreRecFootballVoiceoverVolume=number : Overrides the default voice over volume for all PreRecFootball game types. The default is 1.0
+	PreRecFootballEnglishVoiceoverVolume=number : Overrides the voice over volume for the English game
+	PreRecFootballLeaguePreviousResultsShowEventNumber=false[Default]/true : Used in the previous results ticker to show the event number instead of the round number.
+	PreRecFootballLeagueShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	PreRecFootballLeagueShowBrandLogo : Used to display Soccerbet logo - this is for Italian only (logo is hidden by default). English league displays Soccerbet logo always.
+	Enable_PreRecFootballEnglishLeague=true[Default]/false : Used to disable pre-recorded football english league
+	Enable_PreRecFootballItalianLeague=true[Default]/false : Used to disable pre-recorded football italian league
+
+PreRecFootball Options:
+	PreRecFootballResultsDuration=number : Overrides the number of seconds to show the football results slide
+	PreRecFootballPage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	PreRecFootballPage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	PreRecFootballPreviewDuration=number : Overrides the preview's duration (seconds) while showing a PreRecFootball event
+	PreRecFootballPreviewEvents=integer : Overrides the number of preview events shown while showing PreRecFootball event details (0 disables previews)
+	PreRecFootballResultPreviewEvents=integer : Overrides the number of preview events shown while showing PreRecFootball result (0 disables previews)
+	PreRecFootballVoiceoverVolume=number : Overrides the default voice over volume for all PreRecFootball game types. The default is 1.0
+	PreRecFootballEnglishVoiceoverVolume=number : Overrides the voice over volume for the English game
+	PreRecFootballShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	PreRecFootballShowBrandLogo : Used to display Soccerbet logo - this is for Italian only (logo is hidden by default). English league displays Soccerbet logo always.
+	Enable_PreRecFootballEnglish=true[Default]/false : Used to disable pre-recorded football english 
+	Enable_PreRecFootballItalian=true[Default]/false : Used to disable pre-recorded football italian 
+
+VideoFootball Options:
+	VideoFootballEffectsVolume=number : Overrides the default effects volume for all VideoFootball game types. The default is 0.3
+	VideoFootballEnglishEffectsVolume=number : Overrides the effects volume for the English game. The default is 0.3
+	VideoFootballSpanishEffectsVolume=number : Overrides the effects volume for the Spanish game. The default is 0.3
+	VideoFootballItalianEffectsVolume=number : Overrides the effects volume for the Italian game. The default is 0.3
+	VideoFootballVoiceoverVolume=number : Overrides the default voice over volume for all VideoFootball game types. The default is 1.0
+	VideoFootballEnglishVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 6.0
+	VideoFootballSpanishVoiceoverVolume=number : Overrides the voice over volume for the Spanish game. The default is 1.0
+	VideoFootballItalianVoiceoverVolume=number : Overrides the voice over volume for the Italian game. The default is 1.0
+	VideoFootballShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display
+	VideoFootballShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	VideoFootballPage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	VideoFootballPage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	Enable_VideoFootballEnglish=true[Default]/false : Used to disable video football english
+	Enable_VideoFootballItalian=true[Default]/false : Used to disable video football italian
+	Enable_VideoFootballSpanish=true[Default]/false : Used to disable video football spanish
+
+VideoFootballLeague Options:
+	VideoFootballLeagueEffectsVolume=number : Overrides the default effects volume for all VideoFootballLeague game types. The default is 0.3
+	VideoFootballEnglishLeagueEffectsVolume=number : Overrides the effects volume for the English game. The default is 0.3
+	VideoFootballSpanishLeagueEffectsVolume=number : Overrides the effects volume for the Spanish game. The default is 0.3
+	VideoFootballItalianLeagueEffectsVolume=number : Overrides the effects volume for the Italian game. The default is 0.3
+	VideoFootballLeagueVoiceoverVolume=number : Overrides the default voice over volume for all VideoFootballLeague game types. The default is 1.0
+	VideoFootballEnglishLeagueVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 6.0
+	VideoFootballSpanishLeagueVoiceoverVolume=number : Overrides the voice over volume for the Spanish game. The default is 1.0
+	VideoFootballItalianLeagueVoiceoverVolume=number : Overrides the voice over volume for the Italian game. The default is 1.0
+	VideoFootballLeaguePreviousResultsShowEventNumber=false[Default]/true : Used in the previous results ticker to show the event number instead of the round number.
+	VideoFootballLeagueShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display (for the main game only)
+	VideoFootballLeagueShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	VideoFootballLeaguePage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	VideoFootballLeaguePage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	VideoFootballLeaguePage3Duration=number : Overrides the default number of seconds to display odds Page 3. The default is 10
+	VideoFootballLeaguePage4Duration=number : Overrides the default number of seconds to display odds Page 4. The default is 10
+	VideoFootballLeaguePage5Duration=number : Overrides the default number of seconds to display odds Page 5. The default is 10
+	Enable_VideoFootballEnglishLeague=true[Default]/false : Used to disable video football english league
+	Enable_VideoFootballItalianLeague=true[Default]/false : Used to disable video football italian league
+	Enable_VideoFootballSpanishLeague=true[Default]/false : Used to disable video football spanish league
+
+KenoFootball Options:
+	KenoFootballEffectsVolume=number : Overrides the default effects volume for all KenoFootball game types. The default is 0.3
+	KenoFootballEnglishEffectsVolume=number : Overrides the effects volume for the English game
+	KenoFootballVoiceoverVolume=number : Overrides the default voice over volume for all KenoFootball game types. The default is 1.0
+	KenoFootballEnglishVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 6.0
+	KenoFootballShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display
+	KenoFootballShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	KenoFootballPage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	KenoFootballPage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	Enable_KenoFootballEnglish=true[Default]/false : Used to disable keno football english
+	Enable_KenoFootballItalian=true[Default]/false : Used to disable keno football italian. This event type is only supported in SA Build!
+	Enable_KenoFootballSpanish=true[Default]/false : Used to disable keno football spanish. This event type is only supported in SA Build!
+
+KenoFootballLeague Options:
+	KenoFootballLeagueEffectsVolume=number : Overrides the default effects volume for all KenoFootballLeague game types. The default is 0.3
+	KenoFootballEnglishLeagueEffectsVolume=number : Overrides the effects volume for the English game
+	KenoFootballLeagueVoiceoverVolume=number : Overrides the default voice over volume for all KenoFootballLeague game types. The default is 1.0
+	KenoFootballEnglishLeagueVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 6.0
+	KenoFootballLeagueShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display (for the main game only)
+	KenoFootballLeagueShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	KenoFootballLeaguePage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	KenoFootballLeaguePage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	KenoFootballLeaguePage3Duration=number : Overrides the default number of seconds to display odds Page 3. The default is 10
+	KenoFootballLeaguePage4Duration=number : Overrides the default number of seconds to display odds Page 4. The default is 10
+	Enable_KenoFootballEnglishLeague=true[Default]/false : Used to disable keno football english league
+	Enable_KenoFootballItalianLeague=true[Default]/false : Used to disable keno football italian league. This event type is only supported in SA Build!
+	Enable_KenoFootballSpanishLeague=true[Default]/false : Used to disable keno football spanish league. This event type is only supported in SA Build!
+
+GoalFootball Options:
+	GoalFootballEffectsVolume=number : Overrides the default effects volume for all GoalFootball game types. The default is 0.15
+	GoalFootballEnglishEffectsVolume=number : Overrides the effects volume for the English game. The default is 0.15
+	GoalFootballVoiceoverVolume=number : Overrides the default voice over volume for all GoalFootball game types. The default is 1.0
+	GoalFootballEnglishVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 2.0
+	GoalFootballShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display
+	GoalFootballShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	Color parameters for the English version:
+		GFEnglishBackgroundColor=Color(R,G,B,Alpha) : Overrides the color of the background (affects the color of the background on the Preview panel)
+		GFEnglishHeadingColor=Color(R,G,B,Alpha) : Overrides the color of the headings (Slides and Slide Viewer)
+		GFEnglishOddsTextColor=Color(R,G,B,Alpha) : Overrides the color of the odds font
+		GFEnglishTeamsPanelLeftSideColor=Color(R,G,B,Alpha) : Overrides the color of the left side of the panel behind the team names
+		GFEnglishTeamsPanelCenterColor=Color(R,G,B,Alpha) : Overrides the color of the central part of the panel behind the team names
+		GFEnglishTeamsPanelRightSideColor=Color(R,G,B,Alpha) : Overrides the color of the right side of the panel behind the team names
+		GFEnglishScoreBackgroundColor=Color(R,G,B,Alpha) : Overrides the color of the score panel on the Results slide
+		GFEnglishPreviewHeadingColor=Color(R,G,B,Alpha) : Overrides the color of the headings on the Next Event panel
+		GFEnglishRow1ResultsColor=Color(R,G,B,Alpha) : Overrides the color of the 1st row (and all odd rows after that) on the Results slide
+		GFEnglishRow2ResultsColor=Color(R,G,B,Alpha) : Overrides the color of the 2nd row (and all odd rows after that) on the Results slide
+	Color parameters for other versions: exactly the same as English version above, but replace word "English" with "Italian"/"Spanish"/"Euro".
+	GoalFootballPage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	GoalFootballPage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	Enable_GoalFootballAmerican=true[Default]/false : Used to disable goal football american
+	Enable_GoalFootballChampions=true[Default]/false : Used to disable goal football champions
+	Enable_GoalFootballChinese=true[Default]/false : Used to disable goal football chinese
+	Enable_GoalFootballEnglish=true[Default]/false : Used to disable goal football english
+	Enable_GoalFootballEuro=true[Default]/false : Used to disable goal football euro
+	Enable_GoalFootballFrench=true[Default]/false : Used to disable goal football french
+	Enable_GoalFootballGerman=true[Default]/false : Used to disable goal football german
+	Enable_GoalFootballGreek=true[Default]/false : Used to disable goal football greek
+	Enable_GoalFootballItalian=true[Default]/false : Used to disable goal football italian
+	Enable_GoalFootballSpanish=true[Default]/false : Used to disable goal football spanish
+	Enable_GoalFootballTurkish=true[Default]/false : Used to disable goal football turkish
+	Enable_GoalFootballWorld=true[Default]/false : Used to disable goal football world
+
+GoalFootballLeague Options:
+	GoalFootballLeagueEffectsVolume=number : Overrides the default effects volume for all GoalFootballLeague game types. The default is 0.15
+	GoalFootballEnglishLeagueEffectsVolume=number : Overrides the effects volume for the English game. The default is 0.15
+	GoalFootballLeagueVoiceoverVolume=number : Overrides the default voice over volume for all GoalFootballLeague game types. The default is 1.0
+	GoalFootballEnglishLeagueVoiceoverVolume=number : Overrides the voice over volume for the English game. The current default is 2.0
+	GoalFootballLeaguePreviousResultsShowEventNumber=false[Default]/true : Used in the previous results ticker to show the event number instead of the round number.
+	GoalFootballLeagueShowGoalTime=false[Default]/true : Used to enable the in-game Goal minute display (for the main game only)
+	GoalFootballLeagueShowGameTimer=true[Default]/false : Used to disable the in-game football game timer
+	Enable2SecondClip=false[Default]/true : Used to disable the secondary video display in-game
+	GoalFootballLeaguePage1Duration=number : Overrides the default number of seconds to display odds Page 1. The default is 10
+	GoalFootballLeaguePage2Duration=number : Overrides the default number of seconds to display odds Page 2. The default is 10
+	GoalFootballLeaguePage3Duration=number : Overrides the default number of seconds to display odds Page 3. The default is 10
+	GoalFootballLeaguePage4Duration=number : Overrides the default number of seconds to display odds Page 4. The default is 10
+	GoalFootballLeaguePage5Duration=number : Overrides the default number of seconds to display odds Page 5. The default is 10
+	Enable_GoalFootballAmericanLeague=true[Default]/false : Used to disable goal football american league
+	Enable_GoalFootballChampionsLeague=true[Default]/false : Used to disable goal football champions league
+	Enable_GoalFootballChineseLeague=true[Default]/false : Used to disable goal football chinese league
+	Enable_GoalFootballEnglishLeague=true[Default]/false : Used to disable goal football english league
+	Enable_GoalFootballEuroLeague=true[Default]/false : Used to disable goal football euro league
+	Enable_GoalFootballFrenchLeague=true[Default]/false : Used to disable goal football french league
+	Enable_GoalFootballGermanLeague=true[Default]/false : Used to disable goal football german league
+	Enable_GoalFootballGreekLeague=true[Default]/false : Used to disable goal football greek league
+	Enable_GoalFootballItalianLeague=true[Default]/false : Used to disable goal football italian league
+	Enable_GoalFootballSpanishLeague=true[Default]/false : Used to disable goal football spanish league
+	Enable_GoalFootballTurkishLeague=true[Default]/false : Used to disable goal football turkish league
+	Enable_GoalFootballWorldLeague=true[Default]/false : Used to disable goal football world league
+
+LuckyLoot624 Options:
+	LuckyLoot624ResultsDuration=number : Overrides the number of seconds to show the results slide
+	LuckyLoot624NumberVolume=number : Overrides the number call volume. The default is 1.0
+	LuckyLoot624TutorialPageTime=number : Overrides the number of seconds to display each tutorial. The default is 5
+	LuckyLoot624JackpotPageTime=number : Overrides the number of seconds to show each Jackpot. The default is 5
+	NumberOfJackpotDisplays [Default]=3 : Sets the number of Jackpot text pages. 3 Max
+	JackpotPage1MainText [Default]="1,1 MILLION" : Takes a string that sets the page 1 Jackpot Big value, can be alphabetical or numerical text. JackpotPage1MainText="'1,1 MIllion'"
+	JackpotPage1SecondaryText [Default]="100" : Takes a string that sets the page 1 Jackpot small value, can be numerical text. JackpotPage1SecondaryText="'100'"
+	JackpotPage2MainText [Default]="110 000" : Takes a string that sets the page 2 Jackpot Big value, can be alphabetical or numerical text. JackpotPage2MainText="'110 000'"
+	JackpotPage2SecondaryText [Default]="10" : Takes a string that sets the page 2 Jackpot small value, can be numerical text. JackpotPage2SecondaryText="'10'"
+	JackpotPage3MainText [Default]="5 500" : Takes a string that sets the page 3 Jackpot Big value, can be alphabetical or numerical text. JackpotPage3MainText="'5 500'"
+	JackpotPage3SecondaryText [Default]="1" : Takes a string that sets the page 3 Jackpot small value, can be numerical text. JackpotPage3SecondaryText="'1'"
+	Enable_LuckyLoot624=true[Default]/false : Used to disable LuckyLoot624
+
+LottoRacing Options:
+	LottoRacingStatsPageDuration=number : Overrides the default number of seconds to display each stats page. The default is 10.0
+	LottoRacingResultsDuration=number : Overrides the number of seconds to show the racing results slide
+	Enable_LottoHorses=true[Default]/false : Used to disable Lotto Horses
+	Enable_LottoCars=true[Default]/false : Used to disable Lotto Cars
+	LottoHorsesRaceFinishers=number : Overrides the default number of finishers to "highlight" on the in-game slide and display on the replay slide. The default is 3. The supported range is 3-6.
+	LottoCarsRaceFinishers=number : Overrides the default number of finishers to "highlight" on the in-game slide and display on the replay slide. The default is 3. The supported range is 3-6.
+
+PreRecBasketball:
+	PreRecBasketballDefaultPageDuration=integer  : Overrides the Default number of seconds for displaying each slide on the preamble. (Default is 10 seconds)
+	PreRecBasketballPage1Duration=integer : Sets the number of seconds to display the first preamble slide
+	PreRecBasketballPage2Duration=integer : Sets the number of seconds to display the second preamble slide
+	PreRecBasketballResultsDuration=number : Overrides the number of seconds to show the results slide
+	PreRecBasketballVoiceoverVolume=number : Overrides the default Voiceover Volume. (Default is 1.0)
+	Enable_PreRecBasketballNBALast60=true[default]/false : Used to disable PreRecBasketball
+
+VirtualBasketball Options:
+	VirtualBasketballResultsDuration=number : Overrides the number of seconds to show the virtual basketball results slide
+	Enable_VirtualBasketballNBA=true[Default]/false : Used to disable virtual basketball
+
+VirtualBasketballLeague Options:
+	VirtualBasketballLeagueEffectsVolume=number : Overrides the default effects volume for all VirtualBasketballLeague game types. The default is 1.0
+	VirtualBasketballLeagueVoiceoverVolume=number : Overrides the default voiceover volume for all VirtualBasketballLeague game types. The default is 1.0
+	VirtualBasketballLeaguePreviousResultsShowEventNumber=false[Default]/true : Used in the previous results ticker to show the event number instead of the round number.
+	VirtualBasketballLeagueShowGameTimer=true[Default]/false : Used to disable the in-game game timer
+	VirtualBasketballNBALeagueVoiceoverFrameDelay=number : Used to set frame delay for audio commentary (voiceover)
+	VirtualBasketballLeagueResultsDuration=number : Overrides the number of seconds to show the virtual basketball league results slide
+	Enable_VirtualBasketballNBALeague=true[Default]/false : Used to disable VirtualBasketballLeague
