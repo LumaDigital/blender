@@ -1,8 +1,8 @@
-D:0 : 2022-11-11 12:33:10.724 Log Starting
-I:0 : 2022-11-11 12:33:10.724 VisionViewer Initializing version 1.27.0
-D:0 : 2022-11-11 12:33:10.724 Options: DemoFile='Demo\Random_6.cfg' DemoFirstEventSeconds=0
-D:0 : 2022-11-11 12:33:10.750 Initialized Video Engine
-D:MW: 2022-11-11 12:33:10.756 Window "Vision Viewer" Config:
+D:0 : 2022-11-11 14:25:48.982 Log Starting
+I:0 : 2022-11-11 14:25:48.982 VisionViewer Initializing version 1.27.0
+D:0 : 2022-11-11 14:25:48.982 Options: DemoFile='Demo\Random_2.cfg' DemoFirstEventSeconds=0
+D:0 : 2022-11-11 14:25:49.009 Initialized Video Engine
+D:MW: 2022-11-11 14:25:49.016 Window "Vision Viewer" Config:
 Config {
 	BasedOn="../MainWindow" Y=0 Width=1280 Height=720 Title="Vision Viewer" Windowed=0 Layered=1 WindowCode="MW" ServerCode="MS" ServerNeedsResults=0 ServerNotifyExternalViewer=1 ServerTrace=1 UnityTrace=1 
 	LogLevel=2 Debug=1 VSync=0 MaxFPS=30 ShowEvent=1 JackpotsDisplayHeight=42 IsQuadScreen=0 Enable_Video=1 Template="Generic" 
@@ -487,27 +487,37 @@ Config {
 	}
 }
 
-D:MW: 2022-11-11 12:33:10.863 GL Version: 4.6.0 NVIDIA 511.79
-D:MW: 2022-11-11 12:33:10.864 GL Version 4.6
-D:MW: 2022-11-11 12:33:11.041 Initialized Window Graphics: Vision Viewer
-D:MW: 2022-11-11 12:33:11.041 Initialized Window: Vision Viewer
-D:MW: 2022-11-11 12:33:11.051 Initialized Video Engine for Window: Vision Viewer 1280x720
-D:MW: 2022-11-11 12:33:11.085 Screen 1 supported event types: *
-D:MW: 2022-11-11 12:33:11.326 IO released 540916 cached file bytes
-D:MW: 2022-11-11 12:33:11.327 Enter Connect Slide
-D:MW: 2022-11-11 12:33:11.338 Queue Event ID=1 Game="12345" EventTime=12:33
-D:MW: 2022-11-11 12:33:11.338 Enter Display Slide
-I:MW: 2022-11-11 12:33:14.889 VisionViewer Uninitializing
-D:MW: 2022-11-11 12:33:14.889 Uninitialize Audio Engine
-D:MW: 2022-11-11 12:33:14.891 Delete Windows
-D:MW: 2022-11-11 12:33:14.903 Uninitialized Video Engine for Window: Vision Viewer
-D:MW: 2022-11-11 12:33:14.904 Uninitialized Window Graphics: Vision Viewer
-D:MW: 2022-11-11 12:33:14.904 Uninitialized Window: Vision Viewer
-D:MW: 2022-11-11 12:33:14.905 Uninitialize Gl Context
-D:MW: 2022-11-11 12:33:14.937 Delete Config
-D:MW: 2022-11-11 12:33:14.937 Uninitialize IO
-D:MW: 2022-11-11 12:33:14.937 Uninitialize RealtimeDataCache
-D:MW: 2022-11-11 12:33:14.937 Uninitialize Handler Factories
-D:MW: 2022-11-11 12:33:14.937 Uninitialize Server Factories
-D:MW: 2022-11-11 12:33:14.937 Uninitialize Overlays
-D:MW: 2022-11-11 12:33:14.937 Uninitialize Completed
+D:MW: 2022-11-11 14:25:49.119 GL Version: 4.6.0 NVIDIA 511.79
+D:MW: 2022-11-11 14:25:49.119 GL Version 4.6
+D:MW: 2022-11-11 14:25:49.282 Initialized Window Graphics: Vision Viewer
+D:MW: 2022-11-11 14:25:49.282 Initialized Window: Vision Viewer
+D:MW: 2022-11-11 14:25:49.297 Initialized Video Engine for Window: Vision Viewer 1280x720
+D:MW: 2022-11-11 14:25:49.332 Screen 1 supported event types: *
+D:MW: 2022-11-11 14:25:49.637 IO released 540916 cached file bytes
+D:MW: 2022-11-11 14:25:49.638 Enter Connect Slide
+D:MW: 2022-11-11 14:25:49.650 Queue Event ID=1 Game="12345" EventTime=14:25
+D:MW: 2022-11-11 14:25:49.650 Enter Display Slide
+E:MW: 2022-11-11 14:25:54.407 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:25:54.407 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:25:54.407 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:25:56.331 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:25:58.331 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:25:58.331 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:26:00.330 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:26:07.364 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:26:09.365 CricketSuperOverNational Video failure: UnityRenderingCKT
+E:MW: 2022-11-11 14:26:09.365 CricketSuperOverNational Video failure: UnityRenderingCKT
+I:MW: 2022-11-11 14:26:09.404 VisionViewer Uninitializing
+D:MW: 2022-11-11 14:26:09.404 Uninitialize Audio Engine
+D:MW: 2022-11-11 14:26:09.406 Delete Windows
+D:MW: 2022-11-11 14:26:09.417 Uninitialized Video Engine for Window: Vision Viewer
+D:MW: 2022-11-11 14:26:09.418 Uninitialized Window Graphics: Vision Viewer
+D:MW: 2022-11-11 14:26:09.418 Uninitialized Window: Vision Viewer
+D:MW: 2022-11-11 14:26:09.418 Uninitialize Gl Context
+D:MW: 2022-11-11 14:26:09.454 Delete Config
+D:MW: 2022-11-11 14:26:09.454 Uninitialize IO
+D:MW: 2022-11-11 14:26:09.454 Uninitialize RealtimeDataCache
+D:MW: 2022-11-11 14:26:09.454 Uninitialize Handler Factories
+D:MW: 2022-11-11 14:26:09.454 Uninitialize Server Factories
+D:MW: 2022-11-11 14:26:09.454 Uninitialize Overlays
+D:MW: 2022-11-11 14:26:09.454 Uninitialize Completed
