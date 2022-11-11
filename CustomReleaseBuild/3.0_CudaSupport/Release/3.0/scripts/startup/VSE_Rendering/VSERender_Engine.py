@@ -8,6 +8,7 @@ class Rendering_Engine():
     # We only use composite outputs, but Blender still renders frames to the scene's output.
     # To avoid overwriting artists' preview renders, this output will be changed to a temp dir.
     _TEMP_OUTPUT_PATH = "N:\\Blender\\TempRenders\\"
+    _FFMPEG_RELATIVE_PATH = "FFMPEG\\bin\\ffmpeg.exe"
 
     _BLENDER_COMPOSITING_BACK_EXR_OUTPUT_NODE_NAME = "Back_EXR_Output"
     _BLENDER_COMPOSITING_ACTORS_EXR_OUTPUT_NODE_NAME = "Actors_EXR_Output"
@@ -19,11 +20,16 @@ class Rendering_Engine():
     _VV_MULTI_COMP_NAME = "MultiCompVV.py"
     _VV_COMP_NAME = "compvv.exe"
     _VV_MAKE_NAME = "makevv.exe"
+    _VV_VIEWER_FOLDER_NAME = "VisionViewer"
+
+    _VISION_VIEWER_RANDOM_BAT_PREFIX = "Play_"
 
     _vv_tools_path = None
     _multi_comp_vv_path = None 
     _comp_vv_path = None
     _make_vv_path = None
+    _ffmpeg_path = None
+    _vision_viewer_dir = None
 
     _exr_output_path = None
     _png_output_path = None
@@ -106,6 +112,7 @@ class Rendering_Engine():
                 self._initialize_comp_vv()
             if self._make_vv:
                 self._initialize_make_vv()
+                self._record_vision_video_preview()
 
         print("\n=====================================================================================")
         print ("\nRender processes completed successfully")    
@@ -139,6 +146,7 @@ class Rendering_Engine():
         
         binary_path = os.path.dirname(bpy.app.binary_path)
         self._vv_tools_path = os.path.join(binary_path, "VVTools")
+        self._ffmpeg_dir = os.path.join(binary_path, self._FFMPEG_RELATIVE_PATH)
 
     def _setup_scene(self):
         bpy.context.scene.render.use_single_layer = False
@@ -185,7 +193,7 @@ class Rendering_Engine():
         if tools_missing != "":
             print("\n\n=====================================================================================")
             print("VSE ERROR:\nMissing VV tools: " + tools_missing)
-            print("\n\nGet the all VV tools (MultiCompVV, CompVV, MakeVV) and put them in this directory:\n" + self._vv_tools_path)
+            print("\n\nGet all VV tools (MultiCompVV, CompVV, MakeVV) and put them in this directory:\n" + self._vv_tools_path)
             print("=====================================================================================\n\n")
             return False
         else:
@@ -238,3 +246,19 @@ class Rendering_Engine():
             ])
         
         process.communicate()
+
+    def _record_vision_video_preview(self):
+        self._get_recording_tools()
+
+    def _get_recording_tools(self):
+
+        ffmpeg_missing = False     
+        if not os.path.exists(self._ffmpeg_dir + "test"):
+            ffmpeg_missing = True
+                     
+        if ffmpeg_missing:
+            print("\n\n=====================================================================================")
+            print("VSE ERROR:\nMissing FFMPEG tool ")
+            print("\nFFMPEG should be added here:\n" + self._ffmpeg_dir)
+            print("=====================================================================================\n\n")
+            return False
