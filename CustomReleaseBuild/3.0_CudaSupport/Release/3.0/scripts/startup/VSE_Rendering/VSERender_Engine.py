@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 
 import bpy
 
@@ -111,7 +112,7 @@ class Rendering_Engine():
             if self._composite:
                 self._initialize_comp_vv()
             if self._make_vv:
-                self._initialize_make_vv()
+                #self._initialize_make_vv()
                 self._record_vision_video_preview()
 
         print("\n=====================================================================================")
@@ -253,12 +254,28 @@ class Rendering_Engine():
 
         if self._get_recording_tools():
 
-            process = subprocess.Popen(
-                self._VISION_VIEWER_RANDOM_BAT_PREFIX + "1.bat",
-                shell=True,
-                cwd=r"{}".format(self._vision_viewer_dir))
+            #process = subprocess.Popen(
+            #    self._VISION_VIEWER_RANDOM_BAT_PREFIX + "1.bat",
+            #    stdout=subprocess.PIPE,
+            #    shell=True,
+            #    cwd=r"{}".format(self._vision_viewer_dir))
 
-            process.communicate()
+            process = subprocess.Popen(
+            [
+                "E:\\MartinWork\\OpenSource\\blender\\CustomReleaseBuild\\3.0_CudaSupport\\Release\\VVTools\\VisionViewer\\VisionViewer.exe",
+                "CricketSuperOver",
+                "DemoFile='Demo\Random_1.cfg'",
+                "DemoFirstEventSeconds=0",
+                "Debug",
+                "Max30"          
+            ])
+
+            #process.communicate()
+            time.sleep(10)
+            process.kill()
+            #print("should be dead")
+            #process.terminate()
+
 
     def _get_recording_tools(self):
 
