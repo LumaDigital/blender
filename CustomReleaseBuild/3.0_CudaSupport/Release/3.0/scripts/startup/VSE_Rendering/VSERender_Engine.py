@@ -248,12 +248,22 @@ class Rendering_Engine():
         process.communicate()
 
     def _record_vision_video_preview(self):
-        self._get_recording_tools()
+        print("\n=====================================================================================")
+        print("\nVideo Capture initialized:")
+
+        if self._get_recording_tools():
+
+            process = subprocess.Popen(
+                self._VISION_VIEWER_RANDOM_BAT_PREFIX + "1.bat",
+                shell=True,
+                cwd=r"{}".format(self._vision_viewer_dir))
+
+            process.communicate()
 
     def _get_recording_tools(self):
 
         ffmpeg_missing = False     
-        if not os.path.exists(self._ffmpeg_dir + "test"):
+        if not os.path.exists(self._ffmpeg_dir):
             ffmpeg_missing = True
                      
         if ffmpeg_missing:
@@ -262,3 +272,17 @@ class Rendering_Engine():
             print("\nFFMPEG should be added here:\n" + self._ffmpeg_dir)
             print("=====================================================================================\n\n")
             return False
+
+        vision_viewer_missing = False     
+        self._vision_viewer_dir = os.path.join(self._vv_tools_path, self._VV_VIEWER_FOLDER_NAME)
+        if not os.path.exists(self._vision_viewer_dir):
+            vision_viewer_missing = True
+                     
+        if vision_viewer_missing:
+            print("\n\n=====================================================================================")
+            print("VSE ERROR:\nMissing Vision Viewer tool")
+            print("\nVision Viewer should be added here:\n" + self._vision_viewer_dir)
+            print("=====================================================================================\n\n")
+            return False
+
+        return True;
