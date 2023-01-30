@@ -71,7 +71,8 @@ class VSE_Retarget_Mocap(bpy.types.Operator):
     _bones_preset_path = None
     _mocap_obj = None
     _rig_obj = None
-    
+    _disabled_collections = []
+
     def execute(self, context):
         
         # Assign UI variables
@@ -81,45 +82,65 @@ class VSE_Retarget_Mocap(bpy.types.Operator):
         if self.validate_mocap_Path():
             self.target_mocap()
             
-        return {'FINISHED'}  
+        return {'FINISHED'}
+
     
     def target_mocap(self):
         
         print("\n=====================================================================================")
         print("VSE Automation\n\nLoading motion capture file")
-        
-        
+
+        self.handle_collections_view(hide = False)
+
         bpy.ops.import_anim.bvh(filepath=self._mocap_file_path, global_scale= 0.01, use_fps_scale= True)
-        self._mocap_obj = bpy.context.view_layer.objects.active 
+        self._mocap_obj = bpy.context.view_layer.objects.active
+        mocap_obj_collection_name = self._mocap_obj.users_collection[0].name
         self._rig_obj = bpy.data.objects[bpy.context.scene.vse_rig_name]
-        
+        rig_obj_collection_name = self._rig_obj.users_collection[0].name
+
+        if mocap_obj_collection_name != 'Scene Collection':
+            bpy.data.collections[mocap_obj_collection_name].objects.unlink(self._mocap_obj)
+            bpy.data.collections[rig_obj_collection_name].objects.link(self._mocap_obj)
+
         bpy.context.scene.source_rig = self._mocap_obj.name
         update_source_rig(self, bpy.context)
         
         bpy.context.scene.target_rig = self._rig_obj.name
         update_target_rig(self, bpy.context)
-        
+
         ARP_OT_build_bones_list.execute(self, bpy.context)
         
         _import_config(self, self._bones_preset_path)
         
         bpy.context.scene.arp_show_freeze_warn = True
         bpy.ops.arp.retarget('INVOKE_DEFAULT')
-    
+
+        self.handle_collections_view(hide = True)
+
     def validate_mocap_Path(self):
         if (self._mocap_file_path[-3:] != "bvh"):
             self.show_message_box("Please select .bvh file", "File not bvh!", 'ERROR')
             return False
         
-        return True  
+        return True
     
     def show_message_box(self, message = "", title = "Message Box", icon = 'INFO'):
         def draw(self, context):
             self.layout.label(text = message)
-            
+
         bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
-            
-        
+
+    def handle_collections_view(self, hide):
+        for collection in bpy.data.collections:
+            if not hide:
+                if collection.hide_viewport == True:
+                    self._disabled_collections.append(collection)
+                    collection.hide_viewport = hide
+            else:
+                if collection in self._disabled_collections:
+                    collection.hide_viewport = hide
+
+
 class ARP_OT_remap_export_preset(Operator):
     """Export as custom preset"""
     
