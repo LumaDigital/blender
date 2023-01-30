@@ -3,13 +3,6 @@ from math import *
 from mathutils import *
 
 
-def project_point_onto_plane(q, p, n):
-    # q = point
-    # p = point belonging to the plane
-    # n = plane normal
-    n = n.normalized()
-    return q - ((q - p).dot(n)) * n
-
 
 def signed_angle(vector_u, vector_v, normal):
     normal = normal.normalized()
@@ -89,7 +82,7 @@ def project_point_onto_plane(q, p, n):
     # p = point belonging to the plane
     # n = plane normal
     n = n.normalized()
-    return q - ((q - p).dot(n)) * n    
+    return q - ((q - p).dot(n)) * n
 
 
 def get_pole_angle(base_bone, ik_bone, pole_location):

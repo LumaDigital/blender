@@ -2174,9 +2174,9 @@ def _match_ref(self):
 
         #teeth-tong
         teeth_tong = ["teeth_top_ref.l", "teeth_top_ref.x", "teeth_top_ref.r", "teeth_bot_ref.l", "teeth_bot_ref.x", "teeth_bot_ref.r", "tong_01_ref.x", "tong_02_ref.x", "tong_03_ref.x"]
-        nose_lips_point = (lips_top.head + nose_01.tail)*0.5
+        nose_lips_point = (lips_top.head + nose_01.tail) * 0.5
         transf_vec = nose_lips_point - (get_edit_bone("teeth_top_ref.x").tail)
-        transf_vec +=  (jaw_bone.head - lips_top.head)*0.2
+        transf_vec += (jaw_bone.head - lips_top.head) * 0.2
 
         for bone in teeth_tong:
             if not "tong" in bone or 'tong_03' in bone:

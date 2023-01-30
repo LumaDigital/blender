@@ -3,6 +3,12 @@ from math import *
 from mathutils import *
 from .maths_geo import *
 
+
+def is_deforming(bone):
+    if get_edit_bone(bone):
+        return get_edit_bone(bone).use_deform
+        
+
 def get_selected_edit_bones():
     return bpy.context.selected_editable_bones
 

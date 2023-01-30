@@ -1,4 +1,5 @@
 import bpy
+import addon_utils                  
 
 class ARP_blender_version:
     _string = bpy.app.version_string
@@ -7,6 +8,24 @@ class ARP_blender_version:
     _char = bpy.app.version_char
     
 blender_version = ARP_blender_version()
+
+
+def get_autorigpro_version():
+    addons = addon_utils.modules()[:]
+    
+    for addon in addons:    
+        if addon.bl_info['name'].startswith('Auto-Rig Pro'):
+            print(addon)
+            print()
+            ver_list = addon.bl_info.get('version')
+            ver_string = str(ver_list[0]) + str(ver_list[1]) + str(ver_list[2])
+            ver_int = int(ver_string)
+            return ver_int
+            
+            
+def ver_int_to_str(version_int):
+    to_str = str(version_int)
+    return to_str[0] + '.' + to_str[1] + to_str[2] + '.' + to_str[3] + to_str[4]
 
 
 def convert_drivers_cs_to_xyz(armature):

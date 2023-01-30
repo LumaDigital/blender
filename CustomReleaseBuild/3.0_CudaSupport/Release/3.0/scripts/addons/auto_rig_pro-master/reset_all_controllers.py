@@ -10,6 +10,19 @@ import bpy
 
 
 # FUNCTIONS ------------------------------------
+def get_blender_version():
+    ver = bpy.app.version
+    return ver[0]*100+ver[1]+ver[2]*0.01
+    
+    
+def get_prop_setting(node, prop_name, setting):
+    ver = get_blender_version()
+    if ver >= 300:
+        return node.id_properties_ui(prop_name).as_dict()[setting]
+    else:
+        return node['_RNA_UI'][prop_name][setting]
+    
+    
 def set_inverse_child(b, cns):			
     # direct inverse matrix method
     if cns.subtarget != "":
@@ -59,45 +72,37 @@ def reset_all_controllers():
             bone.rotation_quaternion = [1.0,0.0,0.0,0.0]
             bone.scale = [1.0,1.0,1.0]
         
-        if len(bone.keys()) > 0:
-            for key in bone.keys():
-                
-                if key == 'ik_fk_switch':  
-                    try:
-                        if 'default' in bone['_RNA_UI']['ik_fk_switch']:
-                            bone['ik_fk_switch'] = bone['_RNA_UI']['ik_fk_switch']['default']
-                        else:                   
+        if len(bone.keys()):
+            try:# Error in some rare cases > Error RuntimeError: IDPropertyGroup changed size during iteration   
+                for key in bone.keys():
+                    
+                    if key == 'ik_fk_switch':                        
+                        try:
+                            bone['ik_fk_switch'] = get_prop_setting(bone, 'ik_fk_switch', 'default')                          
+                        except:
                             if 'hand' in bone.name:
                                 bone['ik_fk_switch'] = 1.0
                             else:
-                                bone['ik_fk_switch'] = 0.0
-                    except:
-                        pass
-                
-                
-                if 'stretch_length' in key:
-                    bone['stretch_length'] = 1.0
-                    
-                #if 'auto_stretch' in key:
-                #    bone['auto_stretch'] = 1.0
-                
-                if 'pin' in key:
-                    if 'leg' in key:
-                        bone['leg_pin'] = 0.0
-                    else:
-                        bone['elbow_pin'] = 0.0
+                                bone['ik_fk_switch'] = 0.0                       
+                       
+                    if key == 'stretch_length':
+                        bone[key] = 1.0
+                    # don't set auto-stretch to 1 for now, it's not compatible with Fbx export         
+                    if key == 'leg_pin':
+                        bone[key] = 0.0
+                    if key == 'elbow_min':             
+                        bone[key] = 0.0                        
+                    if key == 'bend_all':
+                        bone[key] = 0.0                    
+                    if key == 'fingers_grasp':
+                        bone[key] = 0.0                    
+                    if key == 'thigh_twist':
+                        bone[key] = 0.0                    
+                    if key == 'arm_twist':
+                        bone[key] = 0.0
                         
-                if 'bend_all' in key:
-                    bone['bend_all'] = 0.0
-                    
-                if 'fingers_grasp' in key:
-                    bone['fingers_grasp'] = 0.0
-                    
-                if 'thigh_twist' in key:
-                    bone['thigh_twist'] = 0.0
-                    
-                if 'arm_twist' in key:
-                    bone['arm_twist'] = 0.0
+            except:
+                pass
               
     #hide layers
     for i, layer_bool in enumerate(saved_layers):

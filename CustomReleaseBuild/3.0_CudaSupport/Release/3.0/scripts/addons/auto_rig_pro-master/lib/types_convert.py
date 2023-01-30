@@ -42,8 +42,10 @@ def vec_to_string(vec):
 def string_to_bool(string):
     if string.lower() == 'true':
         return True
-    if string.lower() == 'false':
+    elif string.lower() == 'false':
         return False
+    else:
+        return None
 
 
 def clamp_max(value, max):

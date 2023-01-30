@@ -67,7 +67,7 @@ def bake_anim(frame_start=0, frame_end=10, only_selected=False, bake_bones=True,
             if len(ob.data.shape_keys.key_blocks) <= 1:
                 continue
             sk_objects.append(ob)
-
+            
     # store matrices
     current_frame = scn.frame_current
     for f in range(int(frame_start), int(frame_end+1)):

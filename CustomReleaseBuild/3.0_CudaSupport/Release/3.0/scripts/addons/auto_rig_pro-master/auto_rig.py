@@ -13,6 +13,7 @@ import gpu, bgl# draw
 from gpu_extras.batch import *
 import gpu_extras
 from bpy.app.handlers import persistent
+import requests# check for updates online
 
 tnzpv = False
 
@@ -691,7 +692,7 @@ class ARP_OT_show_limb_params(Operator):
                 self.bbones_name = new_name   
                 
     
-    limb_type: StringProperty(default="")
+    limb_type: StringProperty(default='')
 
     # ears
     ear_count: IntProperty(default=2, min=1, max=16, description="Set the number of ear bones")
@@ -719,7 +720,18 @@ class ARP_OT_show_limb_params(Operator):
     lips_masters: BoolProperty(default=False, description="Add lips master controllers for up and down lips")
     jaw_rotation: BoolProperty(default=False, description="Use rotation instead of location to open the jaw")
     jaw_separate_location: BoolProperty(default=False, description="Separate the jaw location (the pivot point can be moved when moving the jaw controller)")
-
+    facial_mouth: BoolProperty(default=True, description="Enable the mouth controllers")   
+    facial_teeth: BoolProperty(default=True, description="Enable the teeth controllers")
+    facial_tongue: BoolProperty(default=True, description="Enable the tongue controllers")
+    facial_chins: BoolProperty(default=True, description="Enable the chin controllers")
+    facial_noses: BoolProperty(default=True, description="Enable the nose controllers")
+    facial_eye_l: BoolProperty(default=True, description="Enable the left eye controllers")
+    facial_eye_r: BoolProperty(default=True, description="Enable the right eye controllers")
+    facial_eyebrow_l: BoolProperty(default=True, description="Enable the left eyebrow controllers")
+    facial_eyebrow_r: BoolProperty(default=True, description="Enable the right eyebrow controllers")
+    facial_cheeks: BoolProperty(default=True, description="Enable cheek bones")
+    
+    
     # arms
     finger_thumb: BoolProperty(default=True)
     finger_index: BoolProperty(default=True)
@@ -741,6 +753,7 @@ class ARP_OT_show_limb_params(Operator):
     arm_ikpole_distance: FloatProperty(default=1.0, description="IK Pole distance from the elbow")
     arm_twist_bones: IntProperty(default=1, min=1, max=32, description="Number of twist bones per bone (arm, forearm).\nDisabled if secondary controllers are Bendy Bones")
     arm_bbones_ease_out: BoolProperty(default=True, description="The Ease Out property of the bendy-bones is driven by secondary controllers if true")
+    arm_fk_lock: BoolProperty(default=False, description="Add an Arm Lock setting in FK mode to switch the arm parent space")
     arm_ikfk_default: EnumProperty(items=(('DEFAULT', 'Default Preferences', 'Default as set in the addon preferences'), ('IK', 'IK', 'IK'), ('FK', 'FK', 'FK')), description='Arm IK-FK default switch value', name="IK-FK Default")
 
     # arms wings
@@ -825,8 +838,14 @@ class ARP_OT_show_limb_params(Operator):
     bbones_scale: FloatProperty(default=1.0, description="Size of the controller shapes")
 
     # tail
-    tail_master_at_root: BoolProperty(name="Master Controller at Root", description="Position the tail master controller at the root (first bone)", default=False)
+    tail_master_at_root: BoolProperty(name="Master Controller at Root", description="Position the tail master controller at the root (first bone)", default=True)
     tail_count: IntProperty(name="Tail Count", description='Number of tail bones', default=4, min=1, max=32)
+    tail_side: EnumProperty(name="Side", items=(
+        ('.x', 'Middle (.x)', ''),
+        ('.l', 'Left (.l)', ''),
+        ('.r', 'Right (.r)', '')),
+        description="Side of the tail limb: left, right or middle")
+    tail_update_transforms: BoolProperty(name="Update Transforms", description='Update bones transforms (aligned linearly). Enabled automatically if the tail count changed')
     
     side: StringProperty(default="")
     reset_to_default_settings: BoolProperty(default=True, description="Parameter to skip reset to default settings, useful when setting limbs from operators or other means")
@@ -851,6 +870,16 @@ class ARP_OT_show_limb_params(Operator):
             self.lips_masters = False
             self.jaw_rotation = False
             self.jaw_separate_location = False
+            self.facial_mouth = True       
+            self.facial_teeth = True
+            self.facial_tongue = True
+            self.facial_chins = True
+            self.facial_noses = True
+            self.facial_eye_l = True
+            self.facial_eye_r = True
+            self.facial_eyebrow_l = True
+            self.facial_eyebrow_r = True
+            self.facial_cheeks = True
             self.finger_thumb = True
             self.finger_index = True
             self.finger_middle = True
@@ -917,9 +946,11 @@ class ARP_OT_show_limb_params(Operator):
             self.bbones_side = '.x'
             self.bbones_name = "bbones"
             self.bbones_scale = 1.0
-            self.tail_master_at_root = False
+            self.tail_master_at_root = True
             self.tail_count = 4
-
+            self.tail_side = '.x'
+            self.tail_update_transforms = True
+            
         else:
             self.reset_to_default_settings = True
 
@@ -947,6 +978,8 @@ class ARP_OT_show_limb_params(Operator):
         elif self.limb_type == "tail":
             layout.prop(self, "tail_count", text="Count")
             layout.prop(self, "tail_master_at_root")
+            layout.prop(self, 'tail_side', text="Side")
+            layout.prop(self, 'tail_update_transforms', text="Update Transforms")
             layout.separator()
         elif self.limb_type == "neck":
             layout.prop(self, "neck_count", text="Count")
@@ -962,32 +995,51 @@ class ARP_OT_show_limb_params(Operator):
             col.prop(self, "skulls_align", text="Align Skulls")
             col.enabled = self.skull_bones
             layout.prop(self, "facial", text="Facial")
-            col = layout.column()
-            col.prop(self, "auto_lips", text="Soft Lips")
-            col.enabled = self.facial
-            col1 = col.column()
-            col1.prop(self, "auto_lips_visual", text="Soft Lips: Visual Only")
-            col1.enabled = self.auto_lips
-            col2 = col.column()
-            col2.prop(self, "eye_target_dist", text="Eye Targets Distance")
-            col2.prop(self, "eyelid_align_rot", text="Align Eyelids")
-            col2.prop(self, "eyelid_speed_fac", text="Eyelid Speed Fac")
+            
+            col_f = layout.column()
+            col_f.enabled = self.facial
+            
+            col_f.prop(self, 'facial_eyebrow_l', text='Eyebrow Left')
+            col_f.prop(self, 'facial_eyebrow_r', text='Eyebrow Right')
+            col_f.prop(self, 'facial_eye_l', text='Eye Left')
+            col_f.prop(self, 'facial_eye_r', text='Eye Right')
+            col_f.prop(self, 'facial_noses', text='Nose')
+            col_f.prop(self, 'facial_cheeks', text='Cheeks')
+            col_f.prop(self, 'facial_mouth', text='Mouth')            
+            col_m = col_f.column()
+            col_m.enabled = self.facial_mouth       
+            col_m.prop(self, "auto_lips", text="Soft Lips")
+            
+            col_m_alv = col_m.column()        
+            col_m_alv.prop(self, "auto_lips_visual", text="Soft Lips: Visual Only")
+            col_m_alv.enabled = self.auto_lips
+            col_m_alv.prop(self, "facial_teeth", text="Teeth")
+            col_m_alv.prop(self, "facial_tongue", text="Tongue")
+            col_f.prop(self, 'facial_chins', text='Chins')
+            
+            col_eye = col_f.column()
+            col_eye.prop(self, "eye_target_dist", text="Eye Targets Distance")
+            col_eye.prop(self, "eyelid_align_rot", text="Align Eyelids")
+            col_eye.prop(self, "eyelid_speed_fac", text="Eyelid Speed Fac")
             
             if scn.arp_experimental_mode:
-                col2.separator()
-                col2.label(text="Experimental:")
-                col2.prop(self, "eyebrows_type", text="Eyebrows Type")
-                col2.prop(self, "lips_offset", text="Lips Offset")
-                col2.prop(self, "lips_masters", text="Lips Masters")
-                col2.prop(self, "lips_corner_offset", text="Lips Corners Offset")
-                col2.prop(self, "jaw_rotation", text="Rotate Jaw")
-                col2.prop(self, "jaw_separate_location", text="Separate Jaw Location")
+                col_exp = col_f.column()
+                col_exp.separator()
+                col_exp.label(text="Experimental:")
+                col_exp.prop(self, "eyebrows_type", text="Eyebrows Type")
+                col_exp.prop(self, "lips_offset", text="Lips Offset")
+                col_exp.prop(self, "lips_masters", text="Lips Masters")
+                col_exp.prop(self, "lips_corner_offset", text="Lips Corners Offset")
+                col_exp.prop(self, "jaw_rotation", text="Rotate Jaw")
+                col_exp.prop(self, "jaw_separate_location", text="Separate Jaw Location")
 
             layout.separator()
         elif self.limb_type == "ear":
             layout.prop(self, 'ear_count', text="Count")
             layout.separator()
         elif self.limb_type == "arm":
+            col = layout.column()
+            col.prop(self, 'arm_fk_lock', text="Arm FK Lock-Free")
             col = layout.column()
             col.enabled = (rig.arp_secondary_type != "BENDY_BONES")
             col.prop(self, "arm_twist_bones", text="Twist Bones")
@@ -1006,6 +1058,10 @@ class ARP_OT_show_limb_params(Operator):
             row = col.row(align=True).split(factor=0.45)
             row.label(text="Rot. Fingers from Scale:")
             row.prop(rig, "rig_fingers_rot", text="")
+            
+            row = col.row(align=True).split(factor=0.45)
+            row.label(text="Rot. Thumb from Scale:")
+            row.prop(rig, "rig_fingers_rot_thumb", text="")            
             
             row = col.row(align=True).split(factor=0.45)
             row.label(text="Fingers Shapes:")
@@ -1152,7 +1208,7 @@ class ARP_OT_show_limb_params(Operator):
 
     def execute(self, context):
         if self.limb_type == "tail":            
-            set_tail(self.tail_count, master_at_root=self.tail_master_at_root)
+            set_tail(self.tail_count, master_at_root=self.tail_master_at_root, new_side=self.tail_side, update_transforms=self.tail_update_transforms)
         elif self.limb_type == 'ear':
             set_ears(self.ear_count)
         elif self.limb_type == 'neck':
@@ -1165,6 +1221,7 @@ class ARP_OT_show_limb_params(Operator):
                              self.feathers_layers, self.feathers_subdiv, self.feathers_update_transforms,
                              self.feathers_parent_layers, self.feathers_fold_controller, self.side)
             set_arm_ik_offset(self.hand_ik_offset)
+            set_arm_fk_lock(self.arm_fk_lock)
             set_arm_ikfk_default(self.arm_ikfk_default)
         elif self.limb_type == 'leg':
             set_toes(self.toes_thumb, self.toes_index, self.toes_middle, self.toes_ring, self.toes_pinky)
@@ -1173,15 +1230,17 @@ class ARP_OT_show_limb_params(Operator):
             set_leg_roll_cursor_distance(self.leg_foot_roll_distance, self.leg_foot_roll_fac)
             set_leg_twist(self.leg_twist_bones, self.side, bbones_ease_out=self.leg_bbones_ease_out)
             set_leg_ik_offset(self.foot_ik_offset)
-            set_three_bones_leg(self.three_bones_leg)
-            set_leg_softik(self.leg_softik)
+            set_three_bones_leg(self.three_bones_leg)            
+            set_leg_softik(self.leg_softik)            
             set_leg_ikfk_default(self.leg_ikfk_default)
         elif self.limb_type == 'head':
-            set_facial(enable=self.facial, auto_lips=self.auto_lips, auto_lips_visual=self.auto_lips_visual,
-                       lips_offset=self.lips_offset, lips_corner_offset=self.lips_corner_offset,
+            set_facial(enable=self.facial, mouth_enabled=self.facial_mouth, auto_lips=self.auto_lips, auto_lips_visual=self.auto_lips_visual,
+                       lips_offset=self.lips_offset, lips_corner_offset=self.lips_corner_offset, teeth_enabled=self.facial_teeth, tongue_enabled=self.facial_tongue,
                        eyebrows_type=self.eyebrows_type, lips_masters=self.lips_masters,
                        eyelids_align=self.eyelid_align_rot, eyelid_speed=self.eyelid_speed_fac,
-                       skulls_align=self.skulls_align, skull_bones=self.skull_bones)
+                       skulls_align=self.skulls_align, skull_bones=self.skull_bones, chins_enabled=self.facial_chins, 
+                       noses_enabled=self.facial_noses, eye_l_enabled=self.facial_eye_l, eye_r_enabled=self.facial_eye_r, 
+                       eyebrow_l_enabled=self.facial_eyebrow_l, eyebrow_r_enabled=self.facial_eyebrow_r, cheeks_enabled=self.facial_cheeks)
             if self.facial:
                 set_jaw_rotation_location(self.jaw_rotation, self.auto_lips_visual, self.jaw_separate_location)
                 set_eyetargets_distance(self.eye_target_dist)
@@ -1227,7 +1286,7 @@ class ARP_OT_show_limb_params(Operator):
 
                 spline_root = get_edit_bone(spline_name+"_01_ref"+self.side)
 
-                if len(spline_root.keys()) > 0:
+                if len(spline_root.keys()):
                     if "spline_type" in spline_root.keys():
                         self.spline_type = spline_root["spline_type"]
                     if "spline_count" in spline_root.keys():
@@ -1269,7 +1328,7 @@ class ARP_OT_show_limb_params(Operator):
                     bbones_name = split_name[0]
 
                 bbones_root = get_edit_bone(bbones_name+"_01_ref"+self.side)
-                if len(bbones_root.keys()) > 0:
+                if len(bbones_root.keys()):
                     if "bbones_count" in bbones_root.keys():
                         self.bbones_count = bbones_root["bbones_count"]
                     if "bbones_segments" in bbones_root.keys():
@@ -1307,6 +1366,10 @@ class ARP_OT_show_limb_params(Operator):
                         self.tail_master_at_root = tail_00_ref.get("master_at_root")
                     if "tail_count" in tail_00_ref.keys():
                         self.tail_count = tail_00_ref.get("tail_count")
+                    if "tail_side" in tail_00_ref.keys():
+                        self.tail_side = tail_00_ref.get("tail_side")
+                    if "tail_update_transforms" in tail_00_ref.keys():
+                        self.tail_update_transforms = tail_00_ref.get("tail_update_transforms")
 
             # neck
             elif split_name[0] == 'neck' or split_name[0] == 'subneck':
@@ -1322,11 +1385,15 @@ class ARP_OT_show_limb_params(Operator):
             # head
             elif split_name[0] == 'head':
                 self.limb_type = 'head'
-
-                # evaluate the facial bones
-                self.facial = bool(get_edit_bone("jaw_ref" + self.side))
+                
                 head_ref = get_edit_bone("head_ref" + self.side)
-
+                
+                # evaluate the facial bones
+                if 'facial' in head_ref.keys():
+                    self.facial = head_ref['facial']
+                else:#backward-compatibility test
+                    self.facial = bool(get_edit_bone("jaw_ref" + self.side))
+                    
                 # skull bones
                 if "skull_bones" in head_ref.keys():
                     self.skull_bones = head_ref["skull_bones"]
@@ -1336,7 +1403,7 @@ class ARP_OT_show_limb_params(Operator):
                 if self.facial:
                     # evaluate current facial settings based on current setup to fix
                     # add missing properties of older rigs
-                        # jaw rotation
+                    #   jaw rotation
                     if not 'arp_jaw_rotation' in head_ref.keys():
                         bpy.ops.object.mode_set(mode='POSE')
                         jaw_pbone = get_pose_bone("jawbone"+self.side)
@@ -1349,7 +1416,7 @@ class ARP_OT_show_limb_params(Operator):
                         head_ref = get_edit_bone("head_ref" + self.side)
                         head_ref["arp_jaw_rotation"] = enabled
 
-                        # jaw location
+                    #   jaw location
                     if not 'arp_jaw_location' in head_ref.keys():
                         bpy.ops.object.mode_set(mode='POSE')
                         jaw_pbone = get_pose_bone("jawbone" + self.side)
@@ -1359,34 +1426,34 @@ class ARP_OT_show_limb_params(Operator):
                         head_ref = get_edit_bone("head_ref" + self.side)
                         head_ref['arp_jaw_location'] = enabled
 
-                        # auto lips visual
+                    #   auto lips visual
                     if not "auto_lips_visual" in head_ref.keys():
                         follow_bone_name = "lips_top_follow"+self.side[:-2]+".l"
                         follow_bone = get_edit_bone(follow_bone_name)
                         enabled = True if follow_bone else False
                         head_ref['auto_lips_visual'] = enabled
 
-                        # lips offset
+                    #   lips offset
                     if not "lips_offset" in head_ref.keys():
                         lips_offset_b = get_edit_bone("c_lips_offset" + self.side)
                         enabled = True if lips_offset_b else False
                         head_ref["lips_offset"] = enabled
 
-                        # lips masters
+                    #   lips masters
                     if not "lips_masters" in head_ref.keys():
                         master_top_name = "c_lips_top_master" + self.side
                         master_top_ref = get_edit_bone(master_top_name)
                         enabled = True if master_top_ref else False
                         head_ref["lips_masters"] = enabled
 
-                        # lips corner offset
+                    #   lips corner offset
                     if not "lips_corner_offset" in head_ref.keys():
                         lips_cor_mid_name = "lips_corner_middle" + self.side
                         lips_cor_mid = get_edit_bone(lips_cor_mid_name)
                         enabled = True if lips_cor_mid else False
                         head_ref["lips_corner_offset"] = enabled
 
-                        # eyebrows type
+                    #   eyebrows type
                     if not "eyebrows_type" in head_ref.keys():
                         eyebrows_type = 1
                         eyebrow_end_target = get_edit_bone("eyebrow_01_end_target"+self.side[:-2]+".l")
@@ -1400,13 +1467,14 @@ class ARP_OT_show_limb_params(Operator):
                 bpy.ops.object.mode_set(mode='EDIT')
                 head_ref = get_edit_bone("head_ref" + self.side)
 
-
                 if 'arp_jaw_rotation' in head_ref.keys():
                     self.jaw_rotation = head_ref['arp_jaw_rotation']
                 if 'arp_jaw_location' in head_ref.keys():
                     self.jaw_separate_location = head_ref['arp_jaw_location']
                 if "eye_target_dist" in head_ref.keys():
                     self.eye_target_dist = head_ref['eye_target_dist']
+                if "auto_lips" in head_ref.keys():
+                    self.auto_lips = head_ref["auto_lips"]
                 if "auto_lips_visual" in head_ref.keys():
                     self.auto_lips_visual = head_ref["auto_lips_visual"]
                 if "lips_offset" in head_ref.keys():
@@ -1423,7 +1491,27 @@ class ARP_OT_show_limb_params(Operator):
                     self.skulls_align = head_ref["skulls_align"]
                 if "eyebrows_type" in head_ref.keys():
                     self.eyebrows_type = "type_" + str(head_ref["eyebrows_type"])
-
+                if 'mouth_enabled' in head_ref.keys():
+                    self.facial_mouth = head_ref['mouth_enabled']   
+                if 'teeth_enabled' in head_ref.keys():
+                    self.facial_teeth = head_ref['teeth_enabled']
+                if 'tongue_enabled' in head_ref.keys():
+                    self.facial_tongue = head_ref['tongue_enabled']
+                if 'chins_enabled' in head_ref.keys():
+                    self.facial_chins = head_ref['chins_enabled']
+                if 'noses_enabled' in head_ref.keys():
+                    self.facial_noses = head_ref['noses_enabled']
+                if 'eye_l_enabled' in head_ref.keys():
+                    self.facial_eye_l = head_ref['eye_l_enabled']
+                if 'eye_r_enabled' in head_ref.keys():
+                    self.facial_eye_r = head_ref['eye_r_enabled']
+                if 'eyebrow_l_enabled' in head_ref.keys():
+                    self.facial_eyebrow_l = head_ref['eyebrow_l_enabled']
+                if 'eyebrow_r_enabled' in head_ref.keys():
+                    self.facial_eyebrow_r = head_ref['eyebrow_r_enabled']
+                if 'cheeks_enabled' in head_ref.keys():
+                    self.facial_cheeks = head_ref['cheeks_enabled']
+                    
             # ear
             elif split_name[0] == 'ear':
                 self.limb_type = 'ear'
@@ -1479,7 +1567,12 @@ class ARP_OT_show_limb_params(Operator):
                 # evaluate the current twist bones
                 arm_ref = get_edit_bone("arm_ref" + self.side)
                 if arm_ref:
-                    if len(arm_ref.keys()) > 0:
+                    if len(arm_ref.keys()):
+                        if 'arm_fk_lock' in arm_ref.keys():
+                            self.arm_fk_lock = arm_ref['arm_fk_lock']
+                        else:
+                            self.arm_fk_lock = False
+                            
                         if 'twist_bones_amount' in arm_ref.keys():
                             self.arm_twist_bones = arm_ref['twist_bones_amount']
                         else:
@@ -2456,6 +2549,51 @@ class ARP_OT_clean_scene(Operator):
             context.preferences.edit.use_global_undo = use_global_undo
 
         return {"FINISHED"}
+        
+        
+class ARP_OT_check_for_update(Operator):
+    """Check if a new Auto-Rig Pro version has been released"""
+
+    bl_idname = "arp.check_for_update"
+    bl_label = "Check for Update"
+    
+    current_version = ''
+    latest_version = 0
+    message = ''
+    
+    def invoke(self, context, event):
+        
+        link = "https://blendermarket.com/products/auto-rig-pro"
+        f = requests.get(link).text
+        char1 = '--['
+        char2 = ']--'
+        ver_string = f[f.find(char1)+3 : f.find(char2)]
+        if ver_string == '':
+            self.message = 'Failed to check, is there an internet connection?'
+        else:
+            ver_list = ver_string.split('.')
+            ver_int = int(ver_list[0] + ver_list[1] + ver_list[2])
+            self.latest_version = ver_int        
+            self.current_version = get_autorigpro_version()
+            if self.current_version < self.latest_version:
+                latest_ver_string = ver_int_to_str(self.latest_version)                
+                self.message = 'New version available ' + latest_ver_string
+            else:
+                self.message = 'Already up to date! Keep on riggin\''
+            
+        
+        # show window
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self, width=400)
+        
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text=self.message)
+        
+
+    def execute(self, context):        
+        return {'FINISHED'}
 
 
 class ARP_OT_update_armature(Operator):
@@ -3573,7 +3711,6 @@ class ARP_OT_match_to_rig(Operator):
                 else:
                     print("Armature scale already initialized")
 
-            # Align limbs
             _initialize_armature(self)
 
             # Multi limb support
@@ -5776,7 +5913,9 @@ def _apply_pose_as_rest(self):
             for dr in sk_anim_data.drivers:
                 for i, var in enumerate(dr.driver.variables):
                     if var.targets[0].id_type == 'KEY':
-                        sk_driver_dict[dr.data_path+' '+var.name] = dr.data_path, var.name, var.targets[0].id.name          
+                        target_id = var.targets[0].id
+                        if target_id:
+                            sk_driver_dict[dr.data_path+' '+var.name] = dr.data_path, var.name, target_id.name          
                         
                         
         # delete shape keys on the original mesh
@@ -5897,7 +6036,8 @@ def _apply_pose_as_rest(self):
                 continue
             pose_bones_data[pbone_ref.name] = [pbone_def.name, pbone_def.head.copy(), pbone_def.tail.copy(),
                                                mat3_to_vec_roll(pbone_def.matrix.to_3x3())]
-
+                                               
+    
     #   facial
     facial_map = {ard.neck_ref[0]: ard.neck_deform[1], ard.head_ref[0]: ard.heads_dict['deform'], 'eyebrow_full_ref': 'c_eyebrow_full',
                   'eyebrow_03_ref': 'c_eyebrow_03', 'eyebrow_02_ref': 'c_eyebrow_02', 'eyebrow_01_ref': 'c_eyebrow_01',
@@ -5936,6 +6076,15 @@ def _apply_pose_as_rest(self):
                     continue
                 pose_bones_data[pbone_ref.name] = [pbone_def.name, pbone_def.head.copy(), pbone_def.tail.copy(),
                                                    mat3_to_vec_roll(pbone_def.matrix.to_3x3())]
+                                                   
+                                                   
+        # subnecks
+        for idx in range(1, 17):
+            for pb in rig.pose.bones:
+                if pb.name.startswith('c_subneck_' + str(idx) + head_side):
+                    ref_name = 'subneck_' + str(idx) + '_ref' + head_side
+                    pose_bones_data[ref_name] = [pb.name, pb.head.copy(), pb.tail.copy(),
+                                                   mat3_to_vec_roll(pb.matrix.to_3x3())]
                                                    
                                                    
     # ears
@@ -6011,6 +6160,28 @@ def _apply_pose_as_rest(self):
 
             bpy.ops.object.mode_set(mode='POSE')
             
+    #   tails  
+    for tside in limb_sides.tail_sides:      
+        first_tail_name = "c_tail_00" + tside
+        if get_data_bone(first_tail_name): 
+        
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            tail_count = get_tail_count(tside)
+            
+            bpy.ops.object.mode_set(mode='POSE')
+
+            for i in range(0, tail_count):
+                t_idx = '%02d' % i
+                c_tail_name = 'c_tail_' + t_idx + tside
+
+                c_pb = get_pose_bone(c_tail_name)
+                if c_pb == None:
+                    continue
+
+                ref_name = 'tail_'+t_idx+'_ref'+tside                   
+                roll_val = mat3_to_vec_roll(c_pb.matrix.to_3x3())
+                pose_bones_data[ref_name] = [c_pb.name, c_pb.head.copy(), c_pb.tail.copy(), roll_val]
             
     #   custom bones
     custom_pose_bones_data = {}   
@@ -6033,7 +6204,8 @@ def _apply_pose_as_rest(self):
 
         # shift the foot bank bones
         if "foot_ref" in b_ref_name:
-            side = b_ref_name[-2:]
+            side = get_bone_side(b_ref_name)
+            #side = b_ref_name[-2:]
             bank_bones = ["foot_bank_01_ref", "foot_heel_ref", "foot_bank_02_ref"]
             for bank_name in bank_bones:
                 bank_bone = get_edit_bone(bank_name + side)
@@ -6284,29 +6456,41 @@ def _add_limb(self, type):
                 c_head['head_free'] = default_val
             
             ref_bones_list = []# store the ref bones for selection            
-            # replace custom shapes by custom shapes already existing in the scene
+            
             for b in rig_module.pose.bones:
+                # replace custom shapes by custom shapes already existing in the scene
                 if b.custom_shape:
                     if b.custom_shape.name not in cs_objects:
                         if b.custom_shape.name.replace('.001', '') in cs_objects:
                             b.custom_shape = get_object(b.custom_shape.name.replace('.001', ''))
 
                 # handling of "dupli" naming
-                if found_base:
+                new_dupli_side_x = '_dupli_' + dupli_id + '.x'
+                if found_base:                    
                     b.name = b.name.split('.')[0] + '_dupli_' + dupli_id + '.' + b.name.split('.')[1]
 
                 # store the ref bones for selection
                 if '_ref_dupli_' in b.name or '_ref.' in b.name:
                     ref_bones_list.append(b.name)
 
-                # make constraints links
+                # retarget constraints
                 if len(b.constraints) > 0:
                     for cns in b.constraints:
-                        try:
+                        if 'target' in dir(cns):                       
                             if cns.target == None:
                                 cns.target = get_object(rig_name)
-                        except:
-                            pass
+                                
+            # retarget drivers variables side
+            if found_base:
+                for dr in rig_module.animation_data.drivers:
+                    if dr.data_path.startswith('pose.bones'):                       
+                        for var in dr.driver.variables:
+                            for tar in var.targets:
+                                tar_pbname = get_pbone_name_from_data_path(tar.data_path)
+                                tar_pbname_retarget = retarget_bone_side(tar_pbname, new_dupli_side_x, dupli_only=True)
+                                tar.data_path = tar.data_path.replace(tar_pbname, tar_pbname_retarget)
+                
+                       
 
             # find added/useless custom shapes and delete them
             used_shapes = [b.custom_shape.name for b in rig_module.pose.bones if b.custom_shape]
@@ -6462,31 +6646,31 @@ def _export_limbs(self):
     bpy.ops.armature.select_all(action='DESELECT')
     save_objects = []
 
-    # spine
+    # Spine
     for b in ard.spine_bones + ard.spine_ref_list:
         if get_data_bone(b):# secondary are disabled by default
             select_edit_bone(b)
 
     bpy.ops.armature.separate()
     armature_name = "rig_spine"
-    bpy.data.objects["rig.001"].name = armature_name
+    get_object("rig.001").name = armature_name
     save_objects.append(armature_name)
 
     # Head
     for b in ard.head_bones + ard.facial_bones + ard.facial_ref + ["head_ref.x", "neck_ref.x"] + ard.neck_bones:
         for side in [".l", ".r"]:
             suff = side
-            if b[-2:] == ".x":
+            if b.endswith(".x"):
                 suff = ""
             if get_edit_bone(b + suff):
                 select_edit_bone(b + suff)
 
-    bpy.ops.armature.separate()
+    bpy.ops.armature.separate()    
     armature_name = "rig_head"
-    bpy.data.objects["rig.001"].name = armature_name
+    get_object("rig.001").name = armature_name
     save_objects.append(armature_name)
 
-    # facial
+    #   facial
     bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='DESELECT')
     set_active_object("rig_head")
@@ -6495,10 +6679,9 @@ def _export_limbs(self):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.armature.select_all(action='DESELECT')
 
-    for bi, b in enumerate(ard.facial_ref + ard.facial_bones):
-        bonename = b
+    for bonename in (ard.facial_ref + ard.facial_bones):      
         sides = []
-        if bonename[-2:] == ".x":
+        if bonename.endswith(".x"):
             bonename = bonename.replace(".x", "")
             sides.append(".x")
         else:
@@ -6512,41 +6695,88 @@ def _export_limbs(self):
             ebone = get_edit_bone(bonename + side)
             # save the external parent
             if ebone.parent:
-                if ebone.parent == get_edit_bone("c_skull_01.x") or ebone.parent == get_edit_bone(
-                        "c_skull_02.x") or ebone.parent == get_edit_bone(
-                    "c_skull_03.x") or ebone.parent == get_edit_bone("head.x"):
-                    ebone["arp_parent"] = ebone.parent.name
+                parent_list = ["c_skull_01.x", "c_skull_02.x", "c_skull_03.x", "head.x"]
+                if ebone.parent:
+                    if ebone.parent.name in parent_list:
+                        ebone["arp_parent"] = ebone.parent.name
 
-                    # save the head matrix in a custom prop, used when appending it near to the head later
-            if bi == 0:
-                ebone["arp_offset_matrix"] = get_edit_bone("head_ref.x").matrix.inverted()
+            # save the head matrix in a custom prop, used when appending it near to the head later
+            if bonename == ard.facial_ref_dict['eyebrow_full']:                
+                ebone["arp_offset_matrix"] = get_edit_bone(ard.head_ref[0]).matrix.inverted()
 
     bpy.ops.armature.separate()
+    
     armature_name = "rig_facial"
-    bpy.data.objects["rig_facial_temp.001"].name = armature_name
+    get_object("rig_facial_temp.001").name = armature_name
     save_objects.append(armature_name)
 
-    bpy.data.objects.remove(bpy.data.objects["rig_facial_temp"], do_unlink=True)
+    delete_object(get_object("rig_facial_temp"))
+    
+    def export_facial_limb(armature_name, bones_list, matrix_bone_name, parent_list):
+        bpy.ops.object.select_all(action='DESELECT')
+        set_active_object("rig_head")
+        duplicate_object()
+        arm_name_temp = armature_name + "_temp"
+        bpy.context.active_object.name = arm_name_temp
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.armature.select_all(action='DESELECT')
+        
+        for bonename in bones_list:
+            if get_edit_bone(bonename) == None:
+                continue
+            select_edit_bone(bonename)
+            ebone = get_edit_bone(bonename)
+            
+            # save the head matrix in a custom prop, used when appending it near to the head later
+            if bonename == matrix_bone_name:
+                ebone["arp_offset_matrix"] = get_edit_bone(ard.head_ref[0]).matrix.inverted()
+                
+            # save external parent
+            if ebone.parent:        
+                if ebone.parent:
+                    if ebone.parent.name in parent_list:
+                        ebone["arp_parent"] = ebone.parent.name
+        
+        bpy.ops.armature.separate()
+        
+        get_object(arm_name_temp+'.001').name = armature_name
+        save_objects.append(armature_name)
+        delete_object(get_object(arm_name_temp))
+    
+  
+    export_facial_limb('rig_teeth', ard.teeth_bones+ard.teeth_ref, ard.teeth_bones[0], ['c_skull_01.x', 'jawbone.x'])
+    export_facial_limb('rig_tongue', ard.tongue_bones+ard.tongue_ref, ard.tongue_bones[0], ['jawbone.x'])
+    export_facial_limb('rig_mouth', ard.mouth_bones+ard.mouth_ref, ard.facial_ref_dict['jaw'], ['c_skull_01.x', 'c_skull_02.x', 'c_skull_03.x', 'head.x'])
+    export_facial_limb('rig_chins', ard.chin_bones+ard.chin_ref, ard.chin_bones[0], ['jawbone.x'])
+    export_facial_limb('rig_noses', ard.nose_bones+ard.nose_ref, ard.nose_bones[0], ['c_nose_01.x', 'c_skull_02.x'])
+    export_facial_limb('rig_eye_l', ard.eye_bones_left, ard.eye_bones_left[0], ['head.x', 'c_skull_02.x', 'c_eye_target.x'])
+    export_facial_limb('rig_eye_r', ard.eye_bones_right, ard.eye_bones_right[0], ['head.x', 'c_skull_02.x', 'c_eye_target.x'])
+    export_facial_limb('rig_eyebrow_l', ard.eyebrow_bones_left, ard.eyebrow_bones_left[0], ['head.x', 'c_skull_02.x', 'c_skull_03.x'])
+    export_facial_limb('rig_eyebrow_r', ard.eyebrow_bones_right, ard.eyebrow_bones_right[0], ['head.x', 'c_skull_02.x', 'c_skull_03.x'])
+    export_facial_limb('rig_cheeks', ard.cheek_bones+ard.cheek_ref, ard.cheek_bones[0], ['head.x', 'c_skull_01.x', 'c_skull_02.x', 'c_skull_03.x'])
+    
+    
     bpy.ops.object.select_all(action='DESELECT')
     set_active_object(rig.name)
     bpy.ops.object.mode_set(mode='EDIT')
 
-    # arms
+    # Arms
     for side in [".l", ".r"]:
         for b in ard.arm_bones + ard.arm_ref_list:
             if get_data_bone(b+side):# secondaries are disabled by default
                 select_edit_bone(b+side)
 
         bpy.ops.armature.separate()
+        
         armature_name = "rig_arm" + side
-        bpy.data.objects["rig.001"].name = armature_name
+        get_object("rig.001").name = armature_name
         save_objects.append(armature_name)
 
-    # Fingers.
-    # TODO: Substitute all of the same repeated list/operations by a single algorithm
-
-    for side in [".l", ".r"]:
-        bpy.ops.object.mode_set(mode='OBJECT')
+    # Fingers
+    # TODO: Substitute all of the same repeated list/operations by a single function
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    for side in [".l", ".r"]:        
         bpy.ops.object.select_all(action='DESELECT')
         set_active_object("rig_arm" + side)
         duplicate_object()
@@ -6564,67 +6794,67 @@ def _export_limbs(self):
         for b in ard.thumb_ref_list + ard.thumb_control_list + ard.thumb_intern_list:
             select_edit_bone(b + side)
 
-            # save the hand matrix in a custom prop, used when appending it near to the hand later
+        #   save the hand matrix in a custom prop, used when appending it near to the hand later
         get_edit_bone(ard.thumb_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone(
             "hand_ref" + side).matrix.inverted()
 
         bpy.ops.armature.separate()
         armature_name = "rig_thumb" + side
-        bpy.data.objects["rig_fingers" + side + ".001"].name = armature_name
+        get_object("rig_fingers" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # index
         for b in ard.index_ref_list + ard.index_control_list + ard.index_intern_list:
             select_edit_bone(b + side)
 
-            # save the hand matrix in a custom prop, used when appending it near to the hand later
+        #   save the hand matrix in a custom prop, used when appending it near to the hand later
         get_edit_bone(ard.index_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone(
             "hand_ref" + side).matrix.inverted()
 
         bpy.ops.armature.separate()
         armature_name = "rig_index" + side
-        bpy.data.objects["rig_fingers" + side + ".001"].name = armature_name
+        get_object("rig_fingers" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # middle
         for b in ard.middle_ref_list + ard.middle_control_list + ard.middle_intern_list:
             select_edit_bone(b + side)
 
-            # save the hand matrix in a custom prop, used when appending it near to the hand later
+        #   save the hand matrix in a custom prop, used when appending it near to the hand later
         get_edit_bone(ard.middle_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone("hand_ref" + side).matrix.inverted()
 
         bpy.ops.armature.separate()
         armature_name = "rig_middle" + side
-        bpy.data.objects["rig_fingers" + side + ".001"].name = armature_name
+        get_object("rig_fingers" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # ring
         for b in ard.ring_ref_list + ard.ring_control_list + ard.ring_intern_list:
             select_edit_bone(b + side)
 
-            # save the hand matrix in a custom prop, used when appending it near to the hand later
+        #   save the hand matrix in a custom prop, used when appending it near to the hand later
         get_edit_bone(ard.ring_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone(
             "hand_ref" + side).matrix.inverted()
 
         bpy.ops.armature.separate()
         armature_name = "rig_ring" + side
-        bpy.data.objects["rig_fingers" + side + ".001"].name = armature_name
+        get_object("rig_fingers" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # pinky
         for b in ard.pinky_ref_list + ard.pinky_control_list + ard.pinky_intern_list:
             select_edit_bone(b + side)
 
-            # save the hand matrix in a custom prop, used when appending it near to the hand later
-        get_edit_bone(ard.pinky_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone(
-            "hand_ref" + side).matrix.inverted()
+        #   save the hand matrix in a custom prop, used when appending it near to the hand later
+        get_edit_bone(ard.pinky_ref_list[0] + side)["arp_offset_matrix"] = get_edit_bone("hand_ref" + side).matrix.inverted()
 
         bpy.ops.armature.separate()
         armature_name = "rig_pinky" + side
-        bpy.data.objects["rig_fingers" + side + ".001"].name = armature_name
+        get_object("rig_fingers" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
-    delete_object(get_object("rig_fingers" + side))
+        delete_object(get_object("rig_fingers" + side))
+        
     bpy.ops.object.select_all(action='DESELECT')
     set_active_object(rig.name)
     bpy.ops.object.mode_set(mode='EDIT')
@@ -6639,14 +6869,14 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_leg" + side
-        bpy.data.objects["rig.001"].name = armature_name
+        get_object("rig.001").name = armature_name
         save_objects.append(armature_name)
 
     # Toes
     # TODO: Substitute all of the same repeated list/operations by a single algorithm
-
-    for side in [".l", ".r"]:
-        bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    
+    for side in [".l", ".r"]:        
         bpy.ops.object.select_all(action='DESELECT')
         set_active_object("rig_leg" + side)
         duplicate_object()
@@ -6665,7 +6895,7 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_toes_thumb" + side
-        bpy.data.objects["rig_toes" + side + ".001"].name = armature_name
+        get_object("rig_toes" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # index
@@ -6678,7 +6908,7 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_toes_index" + side
-        bpy.data.objects["rig_toes" + side + ".001"].name = armature_name
+        get_object("rig_toes" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # middle
@@ -6691,7 +6921,7 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_toes_middle" + side
-        bpy.data.objects["rig_toes" + side + ".001"].name = armature_name
+        get_object("rig_toes" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # ring
@@ -6704,7 +6934,7 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_toes_ring" + side
-        bpy.data.objects["rig_toes" + side + ".001"].name = armature_name
+        get_object("rig_toes" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
         # pinky
@@ -6717,10 +6947,11 @@ def _export_limbs(self):
 
         bpy.ops.armature.separate()
         armature_name = "rig_toes_pinky" + side
-        bpy.data.objects["rig_toes" + side + ".001"].name = armature_name
+        get_object("rig_toes" + side + ".001").name = armature_name
         save_objects.append(armature_name)
 
-    bpy.data.objects.remove(bpy.data.objects["rig_toes" + side], do_unlink=True)
+        delete_object(get_object("rig_toes" + side))
+        
     bpy.ops.object.select_all(action='DESELECT')
     set_active_object(rig.name)
     bpy.ops.object.mode_set(mode='EDIT')
@@ -6728,7 +6959,7 @@ def _export_limbs(self):
     # Delete other objects
     for obj in bpy.data.objects:
         if not obj.name in save_objects and obj.name[:3] != "cs_":
-            bpy.data.objects.remove(obj, do_unlink=True)
+            delete_object(obj)
 
     # Delete any constraints dependency remaining between armatures
     for obj in bpy.data.objects:
@@ -6739,7 +6970,7 @@ def _export_limbs(self):
                 for cns in b.constraints:
                     try:
                         if obj.name != "rig_spine":
-                            if cns.target == bpy.data.objects["rig_spine"]:
+                            if cns.target == get_object("rig_spine"):
                                 cns.target = None
                     except:
                         pass
@@ -6755,6 +6986,7 @@ def _export_limbs(self):
     fp = addon_directory + "\modules.blend"
     print("saving modules to path:", fp)
     bpy.ops.wm.save_as_mainfile(filepath=fp, copy=True)
+    
     # end export_limbs()
     
     
@@ -10096,7 +10328,7 @@ def _update_armature(self, context, required=False):
                                 set_prop_setting(hand_ik, 'ik_fk_switch', 'soft_max', 1.0)
                                 print("Changed limits of hand IK FK Switch property")
 
-                                # update drivers
+                        # update drivers
                         for obj in bpy.data.objects:
                             try:
                                 drivers1 = obj.animation_data.drivers
@@ -12784,7 +13016,9 @@ def _dupli_limb(dupli_mirror=False):
     
     def rename_node_side(node):
         # rename to the new bone side after duplication
+        #print("BASE NAME", node.name)
         bname = trim_dupli_name(node.name)# trim .001
+        #print("TRIMMED", bname)
         if dupli_mirror and not symmetrical:# symmetrical limbs (facial) containing both left and right sides can't be mirrored for now
             dupli_side = ''
             if found_base:
@@ -12794,7 +13028,11 @@ def _dupli_limb(dupli_mirror=False):
             dupli_side = '_dupli_' + dupli_id
             new_side = dupli_side + bname[-2:]         
       
+        print("NEW SIDE", new_side)
+        #print("RETARGETTED BONE SIDE", retarget_bone_side(bname, new_side))
+        #print("DOES BONE EXIST", get_data_bone(retarget_bone_side(bname, new_side)))
         node.name = retarget_bone_side(bname, new_side)
+        #print("RENAMED", node.name)
         
 
     def duplicate_ref(limb, side, dupli_id, found_base):        
@@ -12854,22 +13092,32 @@ def _dupli_limb(dupli_mirror=False):
                 ref_bone = get_edit_bone(bname)
 
                 if ref_bone:
-                    if ref_bone.layers[22] == False:  # if not disabled
+                    if ref_bone.layers[22] == False:# if not disabled
                         ref_bone.select = True
 
                 elif bpy.context.scene.arp_debug_mode:
                     print(bname, "not found for duplication")
 
         bpy.ops.object.mode_set(mode='POSE')
-        bpy.ops.object.mode_set(mode='EDIT')  # debug selection
+        bpy.ops.object.mode_set(mode='EDIT')# debug selection
 
         # Duplicate
         duplicate(type="EDIT_BONE")
 
         # Rename
         for ebone in get_selected_edit_bones():
+            print("RENAMING!!", ebone.name)
             rename_node_side(ebone)
             
+            # mirror limb side prop
+            prop_names_side = ['tail_side', 'bbones_side', 'spline_side']
+            for prop_name in prop_names_side:
+                if prop_name in ebone.keys():
+                    if ebone[prop_name] == '.r':
+                        ebone[prop_name] = '.l'
+                    elif ebone[prop_name] == '.l':
+                        ebone[prop_name] = '.r'
+                      
         if dupli_mirror and not symmetrical:
             mirror_bones_transforms(get_selected_edit_bones())
             
@@ -12983,6 +13231,7 @@ def _dupli_limb(dupli_mirror=False):
                 limb_bones_list.append(n)
             
         drivers_data = rig.animation_data.drivers
+        
 
         def duplicate_limb_drivers(drivers_list):
             trim = 0
@@ -13140,6 +13389,7 @@ def _dupli_limb(dupli_mirror=False):
 
         # Rename
         for ebone in get_selected_edit_bones():
+            print("RENAMING RIG BONE", ebone.name)
             rename_node_side(ebone)                
             selected_bones_names.append(ebone.name)
                 
@@ -13159,11 +13409,7 @@ def _dupli_limb(dupli_mirror=False):
             
             # rename
             spline_dupli = get_object(bpy.context.active_object.name)
-            '''
-            base_name = spline_dupli.name[:-4]
-            new_spline_ik_name = base_name.replace(side, '_dupli_' + dupli_id + side[-2:])
-            spline_dupli.name = new_spline_ik_name
-            '''
+            
             rename_node_side(spline_dupli)
             new_spline_ik_name = spline_dupli.name
          
@@ -13252,7 +13498,7 @@ def _dupli_limb(dupli_mirror=False):
                         cns.to_max_x_rot *= -1
 
         # Create drivers
-        if len(bones_drivers_key) > 0:
+        if len(bones_drivers_key):
             duplicate_limb_drivers(drivers_data)
 
         # --Proxy picker bones
@@ -13299,7 +13545,7 @@ def _dupli_limb(dupli_mirror=False):
 
                 # rename
             for ebone in get_selected_edit_bones():
-                base_name = ebone.name[:-4]  # trim .001
+                base_name = ebone.name[:-4]# trim .001
                 new_side = '_dupli_' + dupli_id + base_name[-2:]
                 ebone.name = base_name.replace(_side, new_side[:-2] + base_name[-2:])
                 # set proxy bone
@@ -15107,13 +15353,20 @@ def _align_arm_limbs():
         c_arm_fk = get_edit_bone(c_arm_fk_name+side)
         copy_bone_transforms(ref_arm, c_arm_fk)
 
-            # parent
+        # parent
         shoulder_ref = get_edit_bone(shoulder_ref_name+side)
+        
+        arm_fk_lock = False# if arm FK lock setting is enabled, use constraint instead of direct parent
+        if 'arm_fk_lock' in ref_arm.keys():
+            arm_fk_lock = ref_arm['arm_fk_lock']
 
-        if shoulder_ref.parent:
-            c_arm_fk.parent = parent_retarget(shoulder_ref)
+        if arm_fk_lock:
+            c_arm_fk.parent = None
         else:
-            c_arm_fk.parent = get_edit_bone(get_first_master_controller())
+            if shoulder_ref.parent:
+                c_arm_fk.parent = parent_retarget(shoulder_ref)
+            else:
+                c_arm_fk.parent = get_edit_bone(get_first_master_controller())
 
         # arm_fk
         arm_fk = get_edit_bone(arm_fk_name+side)
@@ -15544,13 +15797,19 @@ def _align_arm_limbs():
     
 
     for side in sides:        
+        # set arm FK lock constraint
+        c_arm_fk = get_pose_bone(c_arm_fk_name+side)
+        armlock_cns = c_arm_fk.constraints.get('ArmLock')
+        if armlock_cns:
+            c_shoulder = get_pose_bone(c_shoulder_name+side)
+            for i, tar in enumerate(armlock_cns.targets):
+                tar.subtarget = c_shoulder.parent.name if i == 0 else 'c_traj'
         
         # set default IK-FK switch value
         c_hand_ik = get_pose_bone(c_hand_ik_name+side)        
         default_IKFK = arms_ikfk_default_dict[side]    
         default_val = 0.0 if default_IKFK == 'IK' else 1.0
-        set_prop_setting(c_hand_ik, 'ik_fk_switch', 'default', default_val)
-            
+        set_prop_setting(c_hand_ik, 'ik_fk_switch', 'default', default_val)        
         arm_ik_pb = get_pose_bone(arm_ik_name + side)
         forearm_ik_pb = get_pose_bone(forearm_ik_name + side)
 
@@ -15635,12 +15894,13 @@ def _align_arm_limbs():
                     str_idx = '_' + str(twist_idx)
                     if twist_idx == 1:
                         str_idx = ''# the first twist bone has no id by convention
-                    twist_bones_list.append(arm_type + '_twist' + str_idx + side)
-
+                    twist_name = arm_type + '_twist' + str_idx + side
+                    twist_bones_list.append(twist_name)
+                    
                 # add the stretch bone to the list
                 twist_bones_list.append(arm_type + '_stretch' + side)
-
-
+                
+            
             # 1.Bendy bones
             if rig.arp_secondary_type == "BENDY_BONES":
 
@@ -15806,8 +16066,8 @@ def _align_arm_limbs():
                 remove_twist_based_str(side)
 
                 bpy.ops.object.mode_set(mode='POSE')
-
-
+            
+            
             # 2.Additive
             elif rig.arp_secondary_type == "ADDITIVE":
 
@@ -15906,8 +16166,8 @@ def _align_arm_limbs():
                 remove_twist_based_str(side)
 
                 bpy.ops.object.mode_set(mode='POSE')
-
-
+            
+            
             # 3.Twist modes
             elif rig.arp_secondary_type == "TWIST_BASED":
                 secondary_list_remove = [c_elbow_bend_name]
@@ -15922,7 +16182,7 @@ def _align_arm_limbs():
                     if ebn:
                         delete_edit_bone(ebn)
 
-                    # proxy
+                #   proxy
                 for bn in secondary_list_remove:
                     ebn_proxy = get_edit_bone(bn+'_proxy'+side)
                     if ebn_proxy:
@@ -15944,11 +16204,11 @@ def _align_arm_limbs():
                     eb.parent = get_edit_bone(secondary_list[bn]+side)
                     # set visibility
                     eb.hide = False
-
+                
                 align_arm_bend_bones(side)
-
+                
                 bpy.ops.object.mode_set(mode='POSE')
-
+                
                 for bn in created_bones:
                     pbn = get_pose_bone(bn)
                     # set rot mode
@@ -15981,16 +16241,16 @@ def _align_arm_limbs():
                 if arm_twist_offset.bone.layers[22] == False:# if not disabled
                     arm_twist_offset.bone.use_deform = False# c_arm_twist_offset is replaced by the first twist bone deformation
                     get_pose_bone(forearm_twist_name+side).bone.use_deform = True
-
-
+                
+                
                 # Set visibility
                 # Hide c_arm_twist_offset in layer
                 arm_twist_offset = get_pose_bone(arm_twist_offset_name+side)
-
+                
                 if arm_twist_offset:
                     set_bone_layer(arm_twist_offset.bone, 8)
-
-                    # proxy
+                
+                #   proxy
                 arm_twist_offset_proxy = get_pose_bone(arm_twist_offset_name+'_proxy'+side)
                 if arm_twist_offset_proxy:
                     set_bone_layer(arm_twist_offset_proxy.bone, 8)
@@ -15998,14 +16258,14 @@ def _align_arm_limbs():
                 bpy.ops.object.mode_set(mode='EDIT')
 
                 # Set Twist Controllers
-                # delete unwanted controllers bones
+                #   delete unwanted controllers bones
                 for idx in range(twist_bones_amount + 1, 33):
                     for blimb in ['arm', 'forearm']:
                         c_twist_to_del = get_edit_bone("c_" + blimb + "_twist_" + str(idx) + side)
                         if c_twist_to_del:
                             delete_edit_bone(c_twist_to_del)
 
-                            # add new offset bones
+                #   add new offset bones
                 for arm in ['arm', 'forearm']:
                     # create an offset bone for the arms stretch bone, to preserve the stretch bone rotation when curving the twist bones
                     str_offset_name = arm + "_str_offset" + side
@@ -16033,6 +16293,7 @@ def _align_arm_limbs():
                         if twist_offset == None:
                             twist_offset = rig.data.edit_bones.new(twist_offset_name)
                         arm_twist = get_edit_bone(arm + "_twist" + side)
+                        arm_twist.use_deform = False
                         # set coords
                         twist_offset.head, twist_offset.tail, twist_offset.roll = arm_twist.head.copy(), arm_twist.tail.copy(), arm_twist.roll
                         # set parent
@@ -16049,8 +16310,7 @@ def _align_arm_limbs():
                 # create the twist controllers
                 c_twist_bones_names = []
                 
-                for bname in twist_bones_list:
-                    
+                for bname in twist_bones_list:                   
                     b_twist = get_edit_bone(bname)
                     base_stretch = None
                     c_twist_name = 'c_' + bname
@@ -16071,6 +16331,7 @@ def _align_arm_limbs():
                     copy_bone_transforms(b_twist, c_twist)
                     # disable base twist bones deform
                     b_twist.use_deform = False
+                   
                     # enable c_twist bone deform
                     c_twist.use_deform = True
                     # set parent
@@ -16177,7 +16438,7 @@ def _align_arm_limbs():
                     elif arm == "arm":
                         set_secondary_drivers(drivers_list, [arm_bendy_name, c_shoulder_bend_name, c_arm_bend_name], side, arm_length)
 
-                        # Bones Segments
+                    #   Bones Segments
                     bpy.ops.object.mode_set(mode='EDIT')
 
                     # delete unwanted bones segments
@@ -16432,6 +16693,7 @@ def _align_arm_limbs():
                     if ('twist.' in bname or 'twist_dupli' in bname) and not 'forearm' in bname:
                         #print("don't use deform for:", bname)
                         b_twist.use_deform = False
+                        print("SET DEFORM TO FALSE", b_twist.name)
 
                 remove_twist_based_constraints(side)
                 remove_twist_based_segments(side)
@@ -16446,6 +16708,7 @@ def _align_arm_limbs():
     bpy.ops.object.mode_set(mode='EDIT')
 
     fingers_rot_prop = rig.rig_fingers_rot
+    thumb_rot_prop = rig.rig_fingers_rot_thumb
     fingers_shape_type = rig.arp_fingers_shape_style
     
     fingers_align_dict = {
@@ -16548,7 +16811,7 @@ def _align_arm_limbs():
         
         print("  Setup fingers rotations...")
         
-        #for base_finger_name in fingers_names:
+        
         for base_finger_name in fingers_control_1:
             finger_name = base_finger_name+side
             finger_ebone  = get_edit_bone(finger_name)
@@ -16561,9 +16824,13 @@ def _align_arm_limbs():
             rot_bone_name = fingers_control_1[base_finger_name][1]+side
             bend_all_name = fingers_control_1[base_finger_name][2]+side        
             
+            valid_prop = fingers_rot_prop
+            
+            if 'thumb' in finger_name:
+                valid_prop = thumb_rot_prop                
+            
             # if scale-rotation is set
-            if fingers_rot_prop != 'no_scale':
-
+            if valid_prop != 'no_scale':                
                 # create bone if necessary
                 if get_edit_bone(add_bone_name) == None:
                     new_bone = rig.data.edit_bones.new(add_bone_name)
@@ -16623,7 +16890,7 @@ def _align_arm_limbs():
                     if add_pbone:
                         const = [x for x in add_pbone.constraints if x.type == "COPY_ROTATION"]
                         if len(const) > 0:
-                            if fingers_rot_prop == 'scale_2_phalanges':
+                            if valid_prop == 'scale_2_phalanges':
                                 const[0].influence = 0.0
                             else:# scale_3_phalanges
                                 const[0].influence = 1.0
@@ -16634,9 +16901,9 @@ def _align_arm_limbs():
                 else:
                     print(" driver:", 'pose.bones["' + bend_all_name + '"].rotation_euler',
                           'not found, could not configure auto fingers rotation')
-
-
-            else:# if finger_rot == "no_scale"
+            
+            
+            else:# "no_scale"
                 # only if the new bone setup exists
                 if get_edit_bone(add_bone_name):
                     # assign params
@@ -16656,8 +16923,8 @@ def _align_arm_limbs():
 
                     
             bpy.ops.object.mode_set(mode='EDIT')
-        
-
+            
+            
         # set auto rotation constraint from the pinky finger if any
         bpy.ops.object.mode_set(mode='POSE')
         
@@ -16666,7 +16933,7 @@ def _align_arm_limbs():
         for finger_name in fingers_autorot_dict:
             pinky = get_pose_bone("c_pinky1_base" + side)
             # set the constraint if there's the pinky
-            current_finger = get_pose_bone(finger_name + side)
+            current_finger = get_pose_bone(finger_name+side)
             if current_finger and pinky:
                 cns = current_finger.constraints.get("Copy Rotation")
                 if cns == None:
@@ -17525,14 +17792,8 @@ def _align_leg_limbs():
                 if bname == "c_toes_end":
                     current_bone = get_edit_bone(bname + side)
                     current_bone.head = toes_ref.tail.copy()
-                    current_bone.tail = current_bone.head + (toes_ref.tail - toes_ref.head) / 2
-                    
-                    """
-                    bpy.ops.armature.select_all(action='DESELECT')
-                    rig.data.edit_bones.active = current_bone
-                    rig.data.edit_bones.active = toes_ref
-                    bpy.ops.armature.calculate_roll(type='ACTIVE')
-                    """
+                    current_bone.tail = current_bone.head + (toes_ref.tail - toes_ref.head) / 2                    
+               
                     align_bone_x_axis(current_bone, toes_ref.x_axis)
                     current_bone.roll += radians(180)
 
@@ -17563,15 +17824,8 @@ def _align_leg_limbs():
                     c_toes_fk = get_edit_bone("c_toes_fk" + side)
                     current_bone.head = toes_ref.head.copy()
                     dir = c_toes_fk.tail - c_toes_fk.head
-                    current_bone.tail = current_bone.head + dir / 3
-                    
-                    """
-                    bpy.ops.armature.select_all(action='DESELECT')
-                    rig.data.edit_bones.active = current_bone
-                    rig.data.edit_bones.active = toes_ref
-                    bpy.ops.armature.calculate_roll(type='ACTIVE')
-                    """
-                    
+                    current_bone.tail = current_bone.head + dir / 3                    
+                   
                     align_bone_x_axis(current_bone, toes_ref.x_axis)
                     current_bone.roll += radians(180)
 
@@ -17598,13 +17852,7 @@ def _align_leg_limbs():
                     c_toes_fk = get_edit_bone("c_toes_fk" + side)
                     current_bone.head = toes_01_ik.tail.copy()
                     current_bone.tail = c_toes_fk.tail.copy()
-                    
-                    """
-                    bpy.ops.armature.select_all(action='DESELECT')
-                    bpy.context.active_object.data.edit_bones.active = current_bone
-                    bpy.context.active_object.data.edit_bones.active = toes_ref
-                    bpy.ops.armature.calculate_roll(type='ACTIVE')
-                    """
+                  
                     align_bone_x_axis(current_bone, toes_ref.x_axis)
                     current_bone.roll += radians(180)#toes_ref.roll + radians(180)
 
@@ -17649,23 +17897,7 @@ def _align_leg_limbs():
                 if toe_c_bone.use_deform:
                     copy_bone_transforms(toe_ref_bone, toe_c_bone)
                     c_toes_names.append(toe_c_name+side)
-        """
-        for t in range(0, 5):
-            max = 4
-            if t == 4:
-                max = 3  # thumb case
-            for i in range(1, max):
-                ref_bone_name = toes_list[t] + str(i) + "_ref" + side
-                c_bone_name = "c_" + toes_list[t] + str(i) + side
-                toe_ref_bone = get_edit_bone(ref_bone_name)
-                toe_c_bone = get_edit_bone(c_bone_name)
-                
-                if toe_ref_bone and toe_c_bone:
-                    if toe_c_bone.use_deform:
-                        copy_bone_transforms(toe_ref_bone, toe_c_bone)
-                        c_toes_names.append(c_bone_name)
-        """
-        
+      
     # Set shape
     bpy.ops.object.mode_set(mode='POSE')
     
@@ -17997,7 +18229,7 @@ def _align_leg_limbs():
                 thigh_stretch_pbone.bone.bbone_handle_type_start = "ABSOLUTE"
                 thigh_stretch_pbone.bone.bbone_handle_type_end = "ABSOLUTE"
                 leg_stretch_pbone.bone.bbone_handle_type_start = "AUTO"  # Absolute leads to slightly bend the first bbones, set it to Automatic instead
-                leg_stretch_pbone.bone.bbone_handle_type_end = "ABSOLUTE"
+                leg_stretch_pbone.bone.bbone_handle_type_end = "TANGENT"
 
                 thigh_stretch_pbone.bone.bbone_custom_handle_start = get_pose_bone("c_thigh_b" + side).bone
 
@@ -18888,6 +19120,78 @@ def get_tail_count(side):
                 tail_count = i+1
                 
     return tail_count
+    
+    
+def align_tail_limbs(tside):
+    # main tail bones
+    last_existing_tail = None
+    tail_parent = None
+    tail_count = 0
+    
+    tail_00_ref_name = 'tail_00_ref'+tside
+    tail_00_ref = get_edit_bone(tail_00_ref_name)  
+    tail_count = get_tail_count(tside)
+    
+    for i in range(0, tail_count):
+        bone_name = 'tail_' + '%02d' % i
+        c_bone = get_edit_bone("c_" + bone_name + tside)
+        ref_bone = get_edit_bone(bone_name + "_ref" + tside)
+
+        if c_bone and ref_bone:
+            copy_bone_transforms(ref_bone, c_bone)
+            last_existing_tail = ref_bone.tail.copy()
+            
+            # parent
+            if 'tail_00' in bone_name:
+                b_parent = None
+
+                if ref_bone.parent: 
+                    p_side = get_bone_side(ref_bone.parent.name)                        
+                    retarget_parent_name = 'c_' + ref_bone.parent.name.replace('_ref'+p_side, p_side)
+                    b_parent = get_edit_bone(retarget_parent_name)
+                    
+                    if b_parent == None:# the parent is not ref bone, or the associated controller can't be found easily
+                        b_parent = ref_bone.parent
+                        
+                traj_parent = get_edit_bone(get_first_master_controller())
+
+                if b_parent:
+                    c_bone.parent = b_parent
+                    tail_parent = b_parent
+                    
+                elif traj_parent:
+                    c_bone.parent = traj_parent
+
+        else:
+            print("Ref or control tail bone not found:", bone_name)
+
+            
+    # master tail bone
+    c_tail_master_name = 'c_tail_master'+tside
+    c_tail_master = get_edit_bone(c_tail_master_name)
+
+    if c_tail_master:
+        tail_00_ref = get_edit_bone(tail_00_ref_name)
+        master_at_root = False
+        if "master_at_root" in tail_00_ref.keys():
+            master_at_root = tail_00_ref["master_at_root"]
+
+        tail_vec = tail_00_ref.tail - tail_00_ref.head
+        if last_existing_tail:
+            tail_vec = last_existing_tail - tail_00_ref.head
+
+        tail_origin = tail_00_ref.head.copy()
+      
+        if not master_at_root:
+            c_tail_master.head = tail_origin + (tail_vec * 0.5)
+            c_tail_master.tail = c_tail_master.head + (tail_vec * 0.5)
+        else:
+            c_tail_master.head = tail_origin
+            c_tail_master.tail = c_tail_master.head + (tail_00_ref.tail - tail_00_ref.head) * 2.0
+            
+        c_tail_master.roll = get_edit_bone("tail_00_ref"+tside).roll
+        c_tail_master.parent = tail_parent
+        c_tail_master.use_deform = False
 
 
 def _align_spine_limbs():
@@ -18904,19 +19208,78 @@ def _align_spine_limbs():
     rig_add = get_rig_add(rig)
 
     # Get reference bones
-    root_name = "root_ref.x"
-    spine_01_name = "spine_01_ref.x"
-    spine_02_name = "spine_02_ref.x"
-    bot_bend_name = "bot_bend_ref"
-
+    root_ref_name = ard.spine_ref_dict['root']#"root_ref.x"
+    c_root_name = ard.spine_bones_dict['c_root']# c_root.x
+    root_name = ard.spine_bones_dict['root']# c_root.x
+    c_p_root_name = ard.spine_bones_dict['root_shape_override']# c_root.x
+    c_root_master_name = ard.spine_bones_dict['c_root_master']
+    root_master_shape_over_name = ard.spine_bones_dict['root_master_shape_override']# c_p_root_master.x
+    c_root_bend_name = ard.spine_bones_dict['c_root_bend']# c_root_bend.x
+    spine_01_ref_name = ard.spine_ref_dict['spine_01']
+    c_spine_01_name = ard.spine_bones_dict['c_spine_01']
+    c_spine_01_bend_name = ard.spine_bones_dict['c_spine_01_bend']
+    c_p_spine_01_name = ard.spine_bones_dict['spine_01_shape_override']
+    spine_01_name = ard.spine_bones_dict['spine_01']
+    c_spine_02_name = ard.spine_bones_dict['c_spine_02']
+    c_spine_02_bend_name = ard.spine_bones_dict['c_spine_02_bend']
+    c_p_spine_02_name = ard.spine_bones_dict['spine_02_shape_override']
+    spine_02_name = ard.spine_bones_dict['spine_02']
+    spine_02_ref_name = ard.spine_ref_dict['spine_02']
+    c_waist_bend_name = ard.spine_bones_dict['c_waist_bend']
+    
+    c_bot_name = ard.bot_dict['c_bot']
+    bot_ref_name = ard.bot_ref_dict['bot']#"bot_bend_ref"
+    
+    neck_ref_name = ard.neck_ref_dict['neck']
+    neck_name = ard.neck_bones_dict['deform']
+    c_neck_name = ard.neck_bones_dict['control']
+    c_neck_01_name = ard.neck_bones_dict['control_01']
+    c_p_neck_name = ard.neck_bones_dict['c_p']
+    c_p_neck_01_name = ard.neck_bones_dict['c_p_01']
+    neck_twist_name = ard.neck_bones_dict['twist']
+    
+    head_ref_name = ard.head_ref[0][:-2]
+    c_head_name = ard.heads_dict['control'][:-2]
+    c_p_head_name = ard.heads_dict['shape_override'][:-2]
+    head_name = ard.heads_dict['deform'][:-2]
+    head_scale_fix_name = ard.heads_dict['scale_fix'][:-2]
+    
+    c_eye_offset_name = ard.eye_bones_dict['eye_offset']['name']   
+    jaw_ref_name = ard.mouth_bones_ref_dict['jaw'][:-2]
+    c_jaw_name = ard.mouth_bones_dict['c_jawbone']['name'][:-2]
+    jaw_name = ard.mouth_bones_dict['jawbone']['name'][:-2]
+    jaw_ret_name = ard.mouth_bones_dict['jaw_ret_bone']['name'][:-2]
+    
+    c_lips_top_mid_name = ard.mouth_bones_dict['c_lips_top_mid']['name']
+    c_lips_bot_mid_name = ard.mouth_bones_dict['c_lips_bot_mid']['name']
+    c_lips_top_name = ard.mouth_bones_dict['c_lips_top']['name']
+    c_lips_top_01_name = ard.mouth_bones_dict['c_lips_top_01']['name']
+    c_lips_bot_name = ard.mouth_bones_dict['c_lips_bot']['name']
+    c_lips_bot_01_name = ard.mouth_bones_dict['c_lips_bot_01']['name']
+    c_lips_smile_name = ard.mouth_bones_dict['c_lips_smile']['name']
+    c_lips_corner_mini_name = ard.mouth_bones_dict['c_lips_corner_mini']['name']
+    c_lips_roll_top_name = ard.mouth_bones_dict['c_lips_roll_top']['name']
+    c_lips_roll_bot_name = ard.mouth_bones_dict['c_lips_roll_bot']['name']
+    
+    c_tongue_01_name = ard.tongue_bones_dict['c_tong_01']['name'][:-2]
+    c_tongue_02_name = ard.tongue_bones_dict['c_tong_02']['name'][:-2]
+    c_tongue_03_name = ard.tongue_bones_dict['c_tong_03']['name'][:-2]
+    
+    c_teeth_top_name = ard.teeth_bones_dict['c_teeth_top_mid']['name'][:-2]
+    c_teeth_bot_name = ard.teeth_bones_dict['c_teeth_bot_mid']['name'][:-2]
+    c_teeth_top_master_name = ard.teeth_bones_dict['teeth_top_master']['name'][:-2]
+    c_teeth_bot_master_name = ard.teeth_bones_dict['teeth_bot_master']['name'][:-2]
+    teeth_top_ref_name = ard.teeth_bones_ref_dict['teeth_top']
+    teeth_bot_ref_name = ard.teeth_bones_ref_dict['teeth_bot']
+    
     bpy.ops.object.mode_set(mode='EDIT')
 
     # Align root master
-    c_root_master = get_edit_bone("c_root_master.x")
+    c_root_master = get_edit_bone(c_root_master_name)
     if c_root_master:
-        init_selection("c_root_master.x")
-        c_root_ref = get_edit_bone(root_name)
-        p_root_master = get_edit_bone("c_p_root_master.x")
+        init_selection(c_root_master_name)
+        c_root_ref = get_edit_bone(root_ref_name)
+        p_root_master = get_edit_bone(root_master_shape_over_name)
 
         align_root_master = True
         if len(c_root_ref.keys()):
@@ -18937,11 +19300,11 @@ def _align_spine_limbs():
         align_bone_z_axis(p_root_master, c_root_ref.z_axis)
 
         # Align root
-        init_selection("c_root.x")
-        c_root = get_edit_bone("c_root.x")
-        root = get_edit_bone("root.x")
-        root_ref = get_edit_bone(root_name)
-        p_root = get_edit_bone("c_p_root.x")
+        init_selection(c_root_name)
+        c_root = get_edit_bone(c_root_name)
+        root = get_edit_bone(root_name)
+        root_ref = get_edit_bone(root_ref_name)
+        p_root = get_edit_bone(c_p_root_name)
 
         c_root.head = root_ref.tail.copy()
         c_root.tail = root_ref.head.copy()
@@ -18949,12 +19312,12 @@ def _align_spine_limbs():
         c_root.roll += radians(180)
         copy_bone_transforms(c_root, root)
 
-            # set the visual shape position
+        # set the visual shape position
         dir = root_ref.tail - root_ref.head
         p_root.head = root_ref.head + (root_ref.tail - root_ref.head) / 2
         p_root.tail = p_root.head + dir
 
-            # set the bone vertical if not quadruped
+        # set the bone vertical if not quadruped
         if not bpy.context.active_object.arp_rig_type == 'quadruped' and not p_root.head[2] == p_root.tail[2]:
             p_root.tail[1] = p_root.head[1]
 
@@ -18962,7 +19325,7 @@ def _align_spine_limbs():
 
 
         # Align root bend
-        root_bend = get_edit_bone("c_root_bend.x")
+        root_bend = get_edit_bone(c_root_bend_name)
         dir = root_bend.tail - root_bend.head
         root_bend.head = c_root.head + (c_root.tail - c_root.head) / 2
         root_bend.tail = root_bend.head + dir
@@ -18973,29 +19336,28 @@ def _align_spine_limbs():
 
 
         # hide the c_root_bend in layer 8 if no secondary controllers
-        if rig.arp_secondary_type == "NONE":
-            #get_data_bone("c_root_bend.x").hide = hide_root_bend
+        if rig.arp_secondary_type == "NONE":           
             set_bone_layer(root_bend, 8)
         else:
             set_bone_layer(root_bend, 1)
 
         bpy.ops.object.mode_set(mode='POSE')
 
-        get_data_bone("c_root_bend.x").hide = False# backward-compatibility fix
-        c_root_master_pb = get_pose_bone("c_root_master.x")
+        get_data_bone(c_root_bend_name).hide = False# backward-compatibility fix
+        c_root_master_pb = get_pose_bone(c_root_master_name)
 
         # c_root_master shape
         if align_root_master:
-            c_root_master_pb.custom_shape_transform = get_pose_bone("c_p_root_master.x")
+            c_root_master_pb.custom_shape_transform = get_pose_bone(root_master_shape_over_name)
         else:
            c_root_master_pb.custom_shape_transform = None
 
         bpy.ops.object.mode_set(mode='EDIT')
 
-        # Align bot bend
+    # Align bot bend
     for side in ['.l', '.r']:
-        bot_ref = get_edit_bone(bot_bend_name + side)
-        c_bot_bend = get_edit_bone("c_bot_bend" + side)
+        bot_ref = get_edit_bone(bot_ref_name + side)
+        c_bot_bend = get_edit_bone(c_bot_name + side)
 
         if bot_ref:
             dir = bot_ref.tail - bot_ref.head
@@ -19007,85 +19369,16 @@ def _align_spine_limbs():
     
     # Align tails
     for tside in limb_sides.tail_sides:
-    
-        # main tail bones
-        last_existing_tail = None
-        tail_parent = None
-        tail_count = 0
-        
-        tail_00_ref_name = 'tail_00_ref'+tside
-        tail_00_ref = get_edit_bone(tail_00_ref_name)  
-        tail_count = get_tail_count(tside)
-        
-        for i in range(0, tail_count):
-            bone_name = 'tail_' + '%02d' % i
-            c_bone = get_edit_bone("c_" + bone_name + tside)
-            ref_bone = get_edit_bone(bone_name + "_ref" + tside)
-
-            if c_bone and ref_bone:
-                copy_bone_transforms(ref_bone, c_bone)
-                last_existing_tail = ref_bone.tail.copy()
-                
-                # parent
-                if 'tail_00' in bone_name:
-                    b_parent = None
-
-                    if ref_bone.parent: 
-                        p_side = get_bone_side(ref_bone.parent.name)                        
-                        retarget_parent_name = 'c_' + ref_bone.parent.name.replace('_ref'+p_side, p_side)
-                        b_parent = get_edit_bone(retarget_parent_name)
-                        
-                        if b_parent == None:# the parent is not ref bone, or the associated controller can't be found easily
-                            b_parent = ref_bone.parent
-                            
-                    traj_parent = get_edit_bone(get_first_master_controller())
-
-                    if b_parent:
-                        c_bone.parent = b_parent
-                        tail_parent = b_parent
-                        
-                    elif traj_parent:
-                        c_bone.parent = traj_parent
-
-            else:
-                print("Ref or control tail bone not found:", bone_name)
-
-        if "i" in locals():
-            del i
-
-        # master tail bone
-        c_tail_master_name = 'c_tail_master'+tside
-        c_tail_master = get_edit_bone(c_tail_master_name)
-
-        if c_tail_master:
-            tail_00_ref = get_edit_bone(tail_00_ref_name)
-            master_at_root = False
-            if "master_at_root" in tail_00_ref.keys():
-                master_at_root = tail_00_ref["master_at_root"]
-
-            tail_vec = tail_00_ref.tail - tail_00_ref.head
-            if last_existing_tail:
-                tail_vec = last_existing_tail - tail_00_ref.head
-
-            tail_origin = tail_00_ref.head
-            # tail_parent = tail_00_ref.parent
-
-            if not master_at_root:
-                c_tail_master.head = tail_origin + (tail_vec * 0.5)
-            else:
-                c_tail_master.head = tail_origin
-            c_tail_master.tail = c_tail_master.head + (tail_vec * 0.5)
-            c_tail_master.roll = get_edit_bone("tail_00_ref"+tside).roll
-            c_tail_master.parent = tail_parent
-            c_tail_master.use_deform = False
+        align_tail_limbs(tside)
 
     # Align spine 01
-    if get_edit_bone("c_spine_01.x"):
-        init_selection("c_spine_01.x")
-        c_spine_01 = get_edit_bone("c_spine_01.x")
-        spine_01 = get_edit_bone("spine_01.x")
-        spine_01_ref = get_edit_bone(spine_01_name)
-        p_spine_01 = get_edit_bone("c_p_spine_01.x")
+    c_spine_01 = get_edit_bone(c_spine_01_name)
+    
+    if c_spine_01:
+        init_selection(c_spine_01_name)        
+        spine_01 = get_edit_bone(spine_01_name)
+        spine_01_ref = get_edit_bone(spine_01_ref_name)
+        p_spine_01 = get_edit_bone(c_p_spine_01_name)
 
         copy_bone_transforms(spine_01_ref, c_spine_01)
         copy_bone_transforms(c_spine_01, spine_01)
@@ -19099,10 +19392,9 @@ def _align_spine_limbs():
             if not bpy.context.active_object.arp_rig_type == 'quadruped' and not p_spine_01.head[2] == p_spine_01.tail[2]:
                 p_spine_01.tail[1] = p_spine_01.head[1]
 
-    # Waist bend
-    waist_name = "c_waist_bend.x"
-    waist_bend = get_edit_bone(waist_name)
-    root_ref = get_edit_bone(root_name)
+    # Waist bend   
+    waist_bend = get_edit_bone(c_waist_bend_name)
+    root_ref = get_edit_bone(root_ref_name)
 
     disable_waist = False
     if rig.arp_secondary_type == "NONE" or rig.arp_secondary_type == "TWIST_BASED":
@@ -19117,10 +19409,10 @@ def _align_spine_limbs():
             created_waist = False
 
             if waist_bend == None:
-                waist_bend = rig.data.edit_bones.new(name=waist_name)
+                waist_bend = create_edit_bone(c_waist_bend_name)
                 set_bone_layer(waist_bend, 1)
                 # set parent
-                waist_bend.parent = get_edit_bone("c_root.x")
+                waist_bend.parent = get_edit_bone(c_root_name)
                 created_waist = True
 
             # align
@@ -19141,21 +19433,20 @@ def _align_spine_limbs():
             if created_waist:
                 bpy.ops.object.mode_set(mode='POSE')
 
-                waist_pb = get_pose_bone(waist_name)
+                waist_pb = get_pose_bone(c_waist_bend_name)
                 # set rot mode
                 waist_pb.rotation_mode = "XYZ"
                 # set group
-                waist_pb.bone_group = get_pose_bone("c_root_master.x").bone_group
+                waist_pb.bone_group = get_pose_bone(c_root_master_name).bone_group
                 # set custom shape
                 set_bone_custom_shape(waist_pb, "cs_torus_01")
 
                 bpy.ops.object.mode_set(mode='EDIT')
 
 
-    # Spine_01_bend
-    spine_01_bend_name = "c_spine_01_bend.x"
-    spine_01_bend = get_edit_bone(spine_01_bend_name)
-    c_spine_01 = get_edit_bone("c_spine_01.x")
+    # Spine_01_bend    
+    spine_01_bend = get_edit_bone(c_spine_01_bend_name)
+    c_spine_01 = get_edit_bone(c_spine_01_name)
 
     if c_spine_01:
         if rig.arp_secondary_type == "NONE":
@@ -19166,9 +19457,9 @@ def _align_spine_limbs():
             created_bone = False
 
             if spine_01_bend == None:
-                spine_01_bend = rig.data.edit_bones.new(spine_01_bend_name)
+                spine_01_bend = create_edit_bone(c_spine_01_bend_name)
                 # set parent
-                spine_01_bend.parent = get_edit_bone("spine_01.x")
+                spine_01_bend.parent = get_edit_bone(spine_01_name)
                 # set layer
                 set_bone_layer(spine_01_bend, 1)
                 created_bone = True
@@ -19185,33 +19476,32 @@ def _align_spine_limbs():
             # backward-compatibility
             if not created_bone:
                 spine_01_bend.hide = False
-                get_data_bone(spine_01_bend_name).hide = False
+                get_data_bone(c_spine_01_bend_name).hide = False
                 spine_01_bend.use_deform = True
 
             if created_bone:
                 bpy.ops.object.mode_set(mode='POSE')
 
-                spine_01_bend_pb = get_pose_bone(spine_01_bend_name)
+                spine_01_bend_pb = get_pose_bone(c_spine_01_bend_name)
                 # set rot mode
                 spine_01_bend_pb.rotation_mode = "XYZ"
                 # set group
-                spine_01_bend_pb.bone_group = get_pose_bone("c_root_master.x").bone_group
+                spine_01_bend_pb.bone_group = get_pose_bone(c_root_master_name).bone_group
                 # set custom shape
                 set_bone_custom_shape(spine_01_bend_pb, "cs_torus_01")
 
                 bpy.ops.object.mode_set(mode='EDIT')
 
 
-    # Align spine 02
-    c_spine_02_name = "c_spine_02.x"
+    # Align spine 02   
     c_spine_02 = get_edit_bone(c_spine_02_name)
 
     if c_spine_02:
         init_selection(c_spine_02_name)
 
-        spine_02 = get_edit_bone("spine_02.x")
-        spine_02_ref = get_edit_bone(spine_02_name)
-        p_spine_02 = get_edit_bone("c_p_spine_02.x")
+        spine_02 = get_edit_bone(spine_02_name)
+        spine_02_ref = get_edit_bone(spine_02_ref_name)
+        p_spine_02 = get_edit_bone(c_p_spine_02_name)
 
         copy_bone_transforms(spine_02_ref, c_spine_02)
         copy_bone_transforms(c_spine_02, spine_02)
@@ -19226,9 +19516,8 @@ def _align_spine_limbs():
             if not bpy.context.active_object.arp_rig_type == 'quadruped' and not p_spine_02.head[2] == p_spine_02.tail[2]:
                 p_spine_02.tail[1] = p_spine_02.head[1]
 
-        # Align spine_02_bend
-        spine_02_bend_name = "c_spine_02_bend.x"
-        spine_02_bend = get_edit_bone(spine_02_bend_name)
+        # Align spine_02_bend        
+        spine_02_bend = get_edit_bone(c_spine_02_bend_name)
 
         if rig.arp_secondary_type == "NONE":
             if spine_02_bend:
@@ -19238,7 +19527,7 @@ def _align_spine_limbs():
             created_bone = False
 
             if spine_02_bend == None:
-                spine_02_bend = rig.data.edit_bones.new(spine_02_bend_name)
+                spine_02_bend = rig.data.edit_bones.new(c_spine_02_bend_name)
                 # set parent
                 spine_02_bend.parent = spine_02
                 # set layer
@@ -19248,7 +19537,7 @@ def _align_spine_limbs():
             # backward-compatibility
             if not created_bone:
                 spine_02_bend.hide = False
-                get_data_bone(spine_02_bend_name).hide = False
+                get_data_bone(c_spine_02_bend_name).hide = False
                 spine_02_bend.use_deform = True
 
             # align
@@ -19263,11 +19552,11 @@ def _align_spine_limbs():
             if created_bone:
                 bpy.ops.object.mode_set(mode='POSE')
 
-                spine_02_bend_pb = get_pose_bone(spine_02_bend_name)
+                spine_02_bend_pb = get_pose_bone(c_spine_02_bend_name)
                 # set rot mode
                 spine_02_bend_pb.rotation_mode = "XYZ"
                 # set group
-                spine_02_bend_pb.bone_group = get_pose_bone("c_root_master.x").bone_group
+                spine_02_bend_pb.bone_group = get_pose_bone(c_root_master_name).bone_group
                 # set custom shape
                 set_bone_custom_shape(spine_02_bend_pb, "cs_torus_01")
 
@@ -19277,16 +19566,16 @@ def _align_spine_limbs():
     # Align spine_03 and higher
     for idx in range(3, rig.rig_spine_count+1):
         str_idx = '%02d' % idx
-        spine_ref = get_edit_bone('spine_'+str_idx+'_ref.x')
-        c_spine = get_edit_bone('c_spine_'+str_idx+'.x')
-        spine = get_edit_bone('spine_'+str_idx+'.x')
+        spine_ref = get_edit_bone(ard.get_spine_name('ref', idx))#get_edit_bone('spine_'+str_idx+'_ref.x')
+        c_spine = get_edit_bone(ard.get_spine_name('control', idx))#get_edit_bone('c_spine_'+str_idx+'.x')
+        spine = get_edit_bone(ard.get_spine_name('base', idx))#get_edit_bone('spine_'+str_idx+'.x')
 
         if spine_ref and c_spine and spine:
             copy_bone_transforms(spine_ref, c_spine)
             copy_bone_transforms(spine_ref, spine)
 
             # Align Spine_bend
-            spine_bend_name = "c_spine_"+str_idx+"_bend.x"
+            spine_bend_name = ard.get_spine_name('control_bend', idx)#"c_spine_"+str_idx+"_bend.x"
             spine_bend = get_edit_bone(spine_bend_name)
 
             if rig.arp_secondary_type == "NONE":
@@ -19297,7 +19586,7 @@ def _align_spine_limbs():
                 created_bone = False
 
                 if spine_bend == None:
-                    spine_bend = rig.data.edit_bones.new(spine_bend_name)
+                    spine_bend = create_edit_bone(spine_bend_name)
                     # set parent
                     spine_bend.parent = c_spine
                     # set layer
@@ -19325,36 +19614,38 @@ def _align_spine_limbs():
                     # set rot mode
                     spine_bend_pb.rotation_mode = "XYZ"
                     # set group
-                    spine_bend_pb.bone_group = get_pose_bone("c_root_master.x").bone_group
+                    spine_bend_pb.bone_group = get_pose_bone(c_root_master_name).bone_group
                     # set custom shape
                     set_bone_custom_shape(spine_bend_pb, "cs_torus_01")
-
+                    
                     bpy.ops.object.mode_set(mode='EDIT')
 
 
 
     print("\n Aligning heads")
     for dupli in limb_sides.head_sides:
-        print(' [' + dupli + ']')
+        print('\n [' + dupli + ']')
 
         # Neck
-        if get_edit_bone("c_neck"+dupli):
-            init_selection("c_neck"+dupli)
-            c_neck = get_edit_bone("c_neck"+dupli)
-            neck = get_edit_bone("neck"+dupli)
-            p_neck = get_edit_bone("c_p_neck" + dupli)
-            p_neck_01 = get_edit_bone("c_p_neck_01" + dupli)
-            neck_ref = get_edit_bone("neck_ref" + dupli)
-            c_neck_01 = get_edit_bone("c_neck_01" + dupli)
+        c_neck_name = "c_neck"+dupli
+        c_neck = get_edit_bone(c_neck_name)
+        
+        if c_neck:
+            init_selection(c_neck_name)            
+            neck = get_edit_bone(neck_name[:-2]+dupli)
+            p_neck = get_edit_bone(c_p_neck_name[:-2] + dupli)
+            p_neck_01 = get_edit_bone(c_p_neck_01_name[:-2] + dupli)
+            neck_ref = get_edit_bone(neck_ref_name[:-2] + dupli)
+            c_neck_01 = get_edit_bone(c_neck_01_name[:-2] + dupli)
 
             # The c_neck_01 controller is only needed when secondary controllers are not None
             if rig.arp_secondary_type == "NONE":
                 if c_neck_01:
                     delete_edit_bone(c_neck_01)
-                    c_neck_01 = get_edit_bone("c_neck_01" + dupli)# update the var to None
+                    c_neck_01 = get_edit_bone(c_neck_01_name[:-2] + dupli)# update the var to None
             else:
                 if c_neck_01 == None:
-                    c_neck_01 = rig.data.edit_bones.new("c_neck_01" + dupli)
+                    c_neck_01 = create_edit_bone(c_neck_01_name[:-2] + dupli)
                     c_neck_01.head, c_neck_01.tail = [0, 0, 0], [0, 0, 1]
                     set_bone_layer(c_neck_01, 1)
 
@@ -19378,10 +19669,10 @@ def _align_spine_limbs():
             copy_bone_transforms(neck_ref, neck)
 
             # neck_twist_target coordinates
-            neck_twist_tar_name = "neck_twist_tar"+dupli
+            neck_twist_tar_name = ard.neck_bones_dict['twist_target'][:-2]+dupli
             neck_twist_tar = get_edit_bone(neck_twist_tar_name)
             if neck_twist_tar:
-                head_ref = get_edit_bone("head_ref"+dupli)
+                head_ref = get_edit_bone(head_ref_name+dupli)
                 copy_bone_transforms(neck_ref, neck_twist_tar)
                 move_bone_to_bone(neck_twist_tar, head_ref)
                 neck_twist_tar.tail = neck_twist_tar.head + (neck_twist_tar.tail-neck_twist_tar.head)*0.5
@@ -19402,16 +19693,17 @@ def _align_spine_limbs():
             p_neck_01.head[1] += -0.07
             p_neck_01.tail = p_neck_01.head
             p_neck_01.tail[1] += -0.03
+            
 
         # Head
-        if get_edit_bone("head_ref"+dupli):
-            init_selection("c_head" + dupli)
-            c_head = get_edit_bone("c_head" + dupli)
-            head_ref = get_edit_bone("head_ref" + dupli)
-            head = get_edit_bone("head" + dupli)
-            head_scale_fix = get_edit_bone("head_scale_fix" + dupli)
-            c_p_head = get_edit_bone("c_p_head" + dupli)
-            neck_twist = get_edit_bone("neck_twist" + dupli)
+        head_ref = get_edit_bone(head_ref_name + dupli)
+        if head_ref:
+            init_selection(c_head_name + dupli)
+            c_head = get_edit_bone(c_head_name + dupli)            
+            head = get_edit_bone(head_name + dupli)
+            head_scale_fix = get_edit_bone(head_scale_fix_name + dupli)
+            c_p_head = get_edit_bone(c_p_head_name + dupli)
+            neck_twist = get_edit_bone(neck_twist_name[:-2] + dupli)
 
             copy_bone_transforms(head_ref, c_head)
             copy_bone_transforms(head_ref, head)
@@ -19420,7 +19712,7 @@ def _align_spine_limbs():
                 copy_bone_transforms(head_ref, neck_twist)
                 neck_twist.tail = neck_twist.head + (neck_twist.tail - neck_twist.head) * 0.5
 
-                # set the visual shape position
+            # set the visual shape position
             if c_p_head:
                 c_p_head.head = head.tail
                 c_p_head.tail = c_p_head.head + (head.tail - head.head) / 2
@@ -19428,23 +19720,23 @@ def _align_spine_limbs():
 
                 
             # Skulls
-            skulls = ["c_skull_01" + dupli, "c_skull_02" + dupli, "c_skull_03" + dupli]
-            jaw_ref = get_edit_bone("jaw_ref" + dupli)
+            skulls = [ard.skulls_dict['01'][:-2] + dupli, ard.skulls_dict['02'][:-2] + dupli, ard.skulls_dict['03'][:-2] + dupli]
+            jaw_ref = get_edit_bone(jaw_ref_name + dupli)
             project_vec = None
             head_vec = head_ref.tail - head_ref.head
 
             # if facial is enabled, align skulls with the jaw tail (chin) height for more precise placement. Available only for the main facial, no duplicate
-            if is_facial_enabled(bpy.context.active_object) and not '_dupli' in dupli:
+            if is_facial_enabled(rig) and not '_dupli' in dupli:
                 head_jaw_vec = jaw_ref.tail - head_ref.tail
                 project_vec = project_vector_onto_vector(head_jaw_vec, head_vec)
 
-                # else align skulls at 1/3 of the neck height
+            # else align skulls at 1/3 of the neck height
             else:
-                neck_ref = get_edit_bone("neck_ref" + dupli)
+                neck_ref = get_edit_bone(neck_ref_name[:-2]+dupli)
                 head_neck_vec = (neck_ref.tail + (neck_ref.head - neck_ref.tail) * 0.3) - head_ref.tail
                 project_vec = project_vector_onto_vector(head_neck_vec, head_vec)
 
-                # start aligning skulls
+            # start aligning skulls
             i = 0
             skulls_align = True
             if "skulls_align" in head_ref.keys():
@@ -19469,7 +19761,7 @@ def _align_spine_limbs():
                             skull_bone.roll = 0
                         if i == 2:
                             skull_bone.head = head_ref.tail + project_vec * 0.3333
-                            skull_bone.tail = head_ref.tail
+                            skull_bone.tail = head_ref.tail.copy()
                             skull_bone.roll = 0
 
                     i += 1
@@ -19478,376 +19770,402 @@ def _align_spine_limbs():
                 del skull
 
         # Align facial
-        # only if enabled
-        c_jaw = get_edit_bone("c_jawbone" + dupli)
-        jaw_ref = get_edit_bone("jaw_ref" + dupli)
+        print('\n Aligning facial...')
+        
+        # mouth
+        c_jaw = get_edit_bone(c_jaw_name + dupli)       
+        jaw_ref = get_edit_bone(jaw_ref_name + dupli)
+        
         if c_jaw and jaw_ref:
-            if get_edit_bone("c_jawbone" + dupli).layers[22] == False:
-                print('\n Aligning facial...')
-                # backward-compatibility
-                # old case, the jaw is rotation based
-                if get_edit_bone("jawbone" + dupli) == None:
-                    copy_bone_transforms(jaw_ref, c_jaw)
+            print("  Mouth...")
+            # backward-compatibility
+            # old case, the jaw is rotation based
+            jaw = get_edit_bone(jaw_name + dupli)
+            if jaw == None:
+                copy_bone_transforms(jaw_ref, c_jaw)
+            else:
+                # new case, the jaw is translation based                    
+                copy_bone_transforms(jaw_ref, jaw)
+                c_jaw.head = jaw.head + (jaw.tail - jaw.head) * 0.5
+                c_jaw.tail = c_jaw.head + (jaw.tail - jaw.head) * 0.5
+                c_jaw.roll = jaw.roll
+                print(" ", c_jaw.name)
+                # update lips retain drivers
+                for driver in rig.animation_data.drivers:
+                    dp_prop = driver.data_path.split(".")[len(driver.data_path.split(".")) - 1]
+                    if jaw_ret_name + dupli in driver.data_path and dp_prop == "scale":
+                        jaw_ret_bone_name = driver.data_path.split('"')[1]
+                        print("  jaw_ret =", jaw_ret_bone_name)
+                        jaw_ret_length = str(round(get_data_bone(jaw_ret_bone_name).length, 4) * 1)
+                        dr = driver.driver
+                        dr.expression = 'max(0.05, 1 - (jaw_rot / ' + jaw_ret_length + ') * stretch_value)'
+                        
+                if "driver" in locals():
+                    del driver
+
+            # jaw_retain
+            jaw_ret_bone = get_edit_bone(jaw_ret_name + dupli)
+            if jaw_ret_bone:
+                copy_bone_transforms(jaw_ref, jaw_ret_bone)
+                jaw_ret_bone.tail = jaw_ret_bone.head + (jaw_ret_bone.tail - jaw_ret_bone.head) * 0.8
+
+            ###############################
+            # jaw base (experimental)
+            jaw_base_bone = get_edit_bone("jaw_base" + dupli)
+            if jaw_base_bone:
+                copy_bone_transforms(jaw_ref, jaw_base_bone)
+
+            # lips_corner_middle (experimental)
+            lips_cor_mid_name = "lips_corner_middle" + dupli
+            lips_cor_mid = get_edit_bone(lips_cor_mid_name)
+            if lips_cor_mid:
+                copy_bone_transforms(jaw_ref, lips_cor_mid)
+                lips_cor_mid.tail += (lips_cor_mid.head - lips_cor_mid.tail) * 0.2
+
+            # lips_retain_corner (experimental)
+            for lat_side in [".l", ".r"]:
+                lips_ret_corn_name = "lips_retain_corner" + dupli[:-2] + lat_side
+                lips_ret_corn = get_edit_bone(lips_ret_corn_name)
+                if lips_ret_corn:
+                    copy_bone_transforms(jaw_ref, lips_ret_corn)
+                    lips_ret_corn.tail += (lips_ret_corn.head - lips_ret_corn.tail) * 0.4
+
+            # lips masters (experimental)
+            lips_top_master_ref = get_edit_bone("lips_top_master_ref" + dupli)
+            c_lips_top_master = get_edit_bone("c_lips_top_master" + dupli)
+            if lips_top_master_ref and c_lips_top_master:
+                copy_bone_transforms(lips_top_master_ref, c_lips_top_master)
+
+            lips_bot_master_ref = get_edit_bone("lips_bot_master_ref" + dupli)
+            c_lips_bot_master = get_edit_bone("c_lips_bot_master" + dupli)
+            if lips_bot_master_ref and c_lips_bot_master:
+                copy_bone_transforms(lips_bot_master_ref, c_lips_bot_master)
+            ###############################    
+            
+            
+            lips = [c_lips_top_mid_name, c_lips_bot_mid_name, c_lips_top_name, c_lips_top_01_name, c_lips_bot_name, c_lips_bot_01_name,
+                    c_lips_smile_name, c_lips_corner_mini_name, c_lips_roll_top_name, c_lips_roll_bot_name]
+                
+            for lip in lips:
+                if lip[-2:] == '.x':
+                    _sides = [dupli]
                 else:
-                    # new case, the jaw is translation based
-                    jaw = get_edit_bone("jawbone" + dupli)
-                    copy_bone_transforms(jaw_ref, jaw)
-                    c_jaw.head = jaw.head + (jaw.tail - jaw.head) * 0.5
-                    c_jaw.tail = c_jaw.head + (jaw.tail - jaw.head) * 0.5
-                    c_jaw.roll = jaw.roll
+                    _sides = [dupli[:-2] + '.l', dupli[:-2] + '.r']
 
-                    # update lips retain drivers
-                    for driver in bpy.context.active_object.animation_data.drivers:
-                        dp_prop = driver.data_path.split(".")[len(driver.data_path.split(".")) - 1]
-                        if "jaw_ret_bone" + dupli in driver.data_path and dp_prop == "scale":
-                            jaw_ret_name = driver.data_path.split('"')[1]
-                            print("  jaw_ret =", jaw_ret_name)
-                            jaw_ret_length = str(round(get_data_bone(jaw_ret_name).length, 4) * 1)
+                for _side in _sides:
+                    ref_name = lip[2:].replace('.x', '') + '_ref' + _side
+                    ref_bone = get_edit_bone(ref_name)
 
-                            dr = driver.driver
-                            dr.expression = 'max(0.05, 1 - (jaw_rot / ' + jaw_ret_length + ') * stretch_value)'
-                    if "driver" in locals():
-                        del driver
-
-                        # jaw_retain
-                jaw_ret_bone = get_edit_bone("jaw_ret_bone" + dupli)
-                if jaw_ret_bone:
-                    copy_bone_transforms(jaw_ref, jaw_ret_bone)
-                    jaw_ret_bone.tail = jaw_ret_bone.head + (jaw_ret_bone.tail - jaw_ret_bone.head) * 0.8
-
-                    # jaw base (experimental)
-                jaw_base_bone = get_edit_bone("jaw_base" + dupli)
-                if jaw_base_bone:
-                    copy_bone_transforms(jaw_ref, jaw_base_bone)
-
-                    # lips_corner_middle (experimental)
-                lips_cor_mid_name = "lips_corner_middle" + dupli
-                lips_cor_mid = get_edit_bone(lips_cor_mid_name)
-                if lips_cor_mid:
-                    copy_bone_transforms(jaw_ref, lips_cor_mid)
-                    lips_cor_mid.tail += (lips_cor_mid.head - lips_cor_mid.tail) * 0.2
-
-                    # lips_retain_corner (experimental)
-                for lat_side in [".l", ".r"]:
-                    lips_ret_corn_name = "lips_retain_corner" + dupli[:-2] + lat_side
-                    lips_ret_corn = get_edit_bone(lips_ret_corn_name)
-                    if lips_ret_corn:
-                        copy_bone_transforms(jaw_ref, lips_ret_corn)
-                        lips_ret_corn.tail += (lips_ret_corn.head - lips_ret_corn.tail) * 0.4
-
-                        # lips masters (experimental)
-                lips_top_master_ref = get_edit_bone("lips_top_master_ref" + dupli)
-                c_lips_top_master = get_edit_bone("c_lips_top_master" + dupli)
-                if lips_top_master_ref and c_lips_top_master:
-                    copy_bone_transforms(lips_top_master_ref, c_lips_top_master)
-
-                lips_bot_master_ref = get_edit_bone("lips_bot_master_ref" + dupli)
-                c_lips_bot_master = get_edit_bone("c_lips_bot_master" + dupli)
-                if lips_bot_master_ref and c_lips_bot_master:
-                    copy_bone_transforms(lips_bot_master_ref, c_lips_bot_master)
-
-                # cheeks
-                cheeks = ["c_cheek_smile", "c_cheek_inflate"]
-
-                for side in [".l", ".r"]:
-                    for cheek in cheeks:
-                        cheek_ref = get_edit_bone(cheek[2:] + "_ref" + dupli[:-2] + side)
-                        cheek_bone = get_edit_bone(cheek + dupli[:-2] + side)
-                        copy_bone_transforms(cheek_ref, cheek_bone)
-
-                    if "cheek" in locals():
-                        del cheek
-
-                        # nose
-                noses = ["c_nose_01" + dupli, "c_nose_02" + dupli, "c_nose_03" + dupli]
-                for nose in noses:
-                    nose_bone = bpy.context.active_object.data.edit_bones[nose]
-                    ref_name = nose[2:-2] + "_ref" + dupli
-                    if "_dupli_" in nose:
-                        ref_name = nose[2:-12] + "_ref" + dupli
-                    nose_ref = bpy.context.active_object.data.edit_bones[ref_name]
-                    if nose_ref and nose_bone:
-                        copy_bone_transforms(nose_ref, nose_bone)
-
-                if "nose" in locals():
-                    del nose
-
-                chins = ["c_chin_01" + dupli, "c_chin_02" + dupli]
-                for chin in chins:
-                    bone = bpy.context.active_object.data.edit_bones.get(chin)
-                    bname = chin[2:-2] + "_ref" + dupli
-                    if "_dupli_" in chin:
-                        bname = chin[2:-12] + "_ref" + dupli
-                    ref_bone = get_edit_bone(bname)
-                    if ref_bone and bone:
+                    # lips controllers
+                    cont_name = lip.replace('.x', '') + _side
+                    bone = get_edit_bone(cont_name)
+                    if bone and ref_bone:
                         copy_bone_transforms(ref_bone, bone)
 
-                if "chin" in locals():
-                    del chin
+                    # lips offset bones
+                    offset_name = lip.replace('.x', '') + '_offset' + _side
+                    if get_edit_bone(offset_name):  # retro-compatibility
+                        offset_bone = get_edit_bone(offset_name)
+                        copy_bone_transforms(ref_bone, offset_bone)
 
-                    # mouth
-                tongs = ["c_tong_01" + dupli, "c_tong_02" + dupli, "c_tong_03" + dupli]
-                for tong in tongs:
-                    current_bone = get_edit_bone(tong)
-                    bname = tong[2:-2] + "_ref" + dupli
-                    if "_dupli_" in tong:
-                        bname = tong[2:-12] + "_ref" + dupli
-                    mouth_bone = get_edit_bone(bname)
-                    if mouth_bone and current_bone:
-                        copy_bone_transforms(mouth_bone, current_bone)
-                    if mouth_bone and get_edit_bone(tong[2:]):
-                        copy_bone_transforms(mouth_bone, get_edit_bone(tong[2:]))
+                    # lips follow bones
+                    follow_name = lip[2:].replace('.x', '') + '_follow' + _side
+                    if get_edit_bone(follow_name):  # retro-compatibility
+                        follow_bone = get_edit_bone(follow_name)
+                        copy_bone_transforms(ref_bone, follow_bone)
 
-                if "tong" in locals():
-                    del tong
+                    # lips retain bones
+                    retain_name = lip.replace('.x', '') + '_retain' + _side
+                    if get_edit_bone(retain_name):# retro-compatibility
+                        retain_bone = get_edit_bone(retain_name)
+                        copy_bone_transforms(ref_bone, retain_bone)
+            
+                
+            # tongues
+            print("  Tongues...")
+            tongs = [c_tongue_01_name + dupli, c_tongue_02_name + dupli, c_tongue_03_name + dupli]
+            for tong in tongs:
+                current_bone = get_edit_bone(tong)
+                bname = tong[2:-2] + "_ref" + dupli
+                if "_dupli_" in tong:
+                    bname = tong[2:-12] + "_ref" + dupli
+                mouth_bone = get_edit_bone(bname)
+                if mouth_bone and current_bone:
+                    copy_bone_transforms(mouth_bone, current_bone)
+                if mouth_bone and get_edit_bone(tong[2:]):
+                    copy_bone_transforms(mouth_bone, get_edit_bone(tong[2:]))
+            
+            # teeths
+            print("  Teeth...")
+            
+            teeth = [c_teeth_top_name+dupli, c_teeth_bot_name+dupli, c_teeth_bot_name+dupli[:-2]+".l",
+                     c_teeth_bot_name+dupli[:-2]+".r", c_teeth_top_name+dupli[:-2]+".l",
+                     c_teeth_top_name+ dupli[:-2]+".r", c_teeth_top_master_name+dupli, c_teeth_bot_master_name+dupli]                     
+            
+            for tooth in teeth:
+                current_bone = get_edit_bone(tooth)
 
-                teeth = ["c_teeth_top" + dupli, "c_teeth_bot" + dupli, 'c_teeth_top' + dupli[:-2] + ".l",
-                         'c_teeth_top' + dupli[:-2] + ".r", 'c_teeth_bot' + dupli[:-2] + ".l",
-                         'c_teeth_bot' + dupli[:-2] + ".r", 'c_teeth_top_master' + dupli, 'c_teeth_bot_master' + dupli]
+                if current_bone:
+                    if not 'master' in tooth:
+                        ref_name = tooth.replace('.', '_ref.')[2:]
+                        if "_dupli_" in tooth:
+                            ref_name = (tooth[:-12] + "_ref" + dupli)[2:]
 
-                for tooth in teeth:
-                    current_bone = get_edit_bone(tooth)
-
-                    if current_bone:
-                        if not 'master' in tooth:
-                            ref_name = tooth.replace('.', '_ref.')[2:]
-                            if "_dupli_" in tooth:
-                                ref_name = (tooth[:-12] + "_ref" + dupli)[2:]
-
-                            tooth1 = get_edit_bone(ref_name)
-                            if tooth1:
-                                copy_bone_transforms(tooth1, current_bone)
-                            else:
-                                print("  Missing tooth1:", ref_name)
-
-                        if tooth == 'c_teeth_top_master' + dupli:
-                            ref_top_name = 'teeth_top_ref' + dupli
-                            ref_top = get_edit_bone(ref_top_name)
-                            if ref_top:
-                                current_bone.head = ref_top.head + (ref_top.head - ref_top.tail) / 2
-                                current_bone.tail = ref_top.tail + (ref_top.head - ref_top.tail) / 2
-                            else:
-                                print("  Missing tooth top ref", ref_top_name)
-
-                        if tooth == 'c_teeth_bot_master' + dupli:
-                            ref_bot_name = 'teeth_bot_ref' + dupli
-                            ref_bot = get_edit_bone(ref_bot_name)
-                            if ref_bot:
-                                current_bone.head = ref_bot.head + (ref_bot.head - ref_bot.tail) / 2
-                                current_bone.tail = ref_bot.tail + (ref_bot.head - ref_bot.tail) / 2
-                            else:
-                                print("  Missing tooth bot ref", ref_top_name)
-                    else:
-                        print("  Missing tooth:", tooth)
-
-                if "tooth" in locals():
-                    del tooth
-
-                lips = ["c_lips_top.x", "c_lips_bot.x", "c_lips_top", "c_lips_top_01", "c_lips_bot", "c_lips_bot_01",
-                        "c_lips_smile", "c_lips_corner_mini", "c_lips_roll_top.x", "c_lips_roll_bot.x"]
-
-                for lip in lips:
-
-                    if lip[-2:] == ".x":
-                        _sides = [dupli]
-                    else:
-                        _sides = [dupli[:-2] + ".l", dupli[:-2] + ".r"]
-
-                    for _side in _sides:
-                        ref_name = lip[2:].replace('.x', '') + "_ref" + _side
-                        ref_bone = get_edit_bone(ref_name)
-
-                        # lips controllers
-                        cont_name = lip.replace(".x", "") + _side
-                        bone = get_edit_bone(cont_name)
-                        if bone and ref_bone:
-                            copy_bone_transforms(ref_bone, bone)
-
-                        # lips offset bones
-                        offset_name = lip.replace(".x", "") + "_offset" + _side
-                        if get_edit_bone(offset_name):  # retro-compatibility
-                            offset_bone = get_edit_bone(offset_name)
-                            copy_bone_transforms(ref_bone, offset_bone)
-
-                        # lips follow bones
-                        follow_name = lip[2:].replace(".x", "") + "_follow" + _side
-                        if get_edit_bone(follow_name):  # retro-compatibility
-                            follow_bone = get_edit_bone(follow_name)
-                            copy_bone_transforms(ref_bone, follow_bone)
-
-                        # lips retain bones
-                        retain_name = lip.replace(".x", "") + "_retain" + _side
-                        if get_edit_bone(retain_name):  # retro-compatibility
-                            retain_bone = get_edit_bone(retain_name)
-                            copy_bone_transforms(ref_bone, retain_bone)
-
-                if "lip" in locals():
-                    del lip
-
-                    # Eyes
-                    # make list of all eyes bones
-                eyes = []
-                init_selection("c_eye_offset" + dupli[:-2] + ".l")
-                bpy.ops.armature.select_similar(type='CHILDREN')
-                for bone in get_selected_edit_bones()[:]:
-                    if not ".r" in bone.name:  # left side only
-                        eyes.append(bone.name[:-2])
-
-                if "bone" in locals():
-                    del bone
-
-                # direct copy from ref
-                for side in [".l", ".r"]:
-                    for eye_name in eyes:
-                        # do not align main c_eyelid now, done after
-                        if eye_name == "c_eyelid_top" or eye_name == "c_eyelid_bot":
-                            continue
-                        ref_name = eye_name.replace('c_', '') + "_ref" + side
-                        cname = eye_name + dupli[:-2] + side
-                        if "_dupli_" in eye_name:
-                            ref_name = eye_name.replace('c_', '')[:-10] + "_ref" + dupli[:-2] + side
-                            cname = eye_name[:-10] + dupli[:-2] + side
-
-                        bone_ref = get_edit_bone(ref_name)
-                        current_bone = get_edit_bone(cname)
-
-                        if bone_ref and current_bone:
-                            copy_bone_transforms(bone_ref, current_bone)
+                        tooth1 = get_edit_bone(ref_name)
+                        if tooth1:
+                            copy_bone_transforms(tooth1, current_bone)
                         else:
-                            if bpy.context.scene.arp_debug_mode:
-                                print("Bones don't exist:", ref_name, cname)
+                            print("  Missing tooth1:", ref_name)
 
-                    if "eye_name" in locals():
-                        del eye_name
+                    if tooth == c_teeth_top_master_name+dupli:
+                        ref_top_name = teeth_top_ref_name+dupli
+                        ref_top = get_edit_bone(ref_top_name)
+                        if ref_top:
+                            current_bone.head = ref_top.head + (ref_top.head - ref_top.tail) / 2
+                            current_bone.tail = ref_top.tail + (ref_top.head - ref_top.tail) / 2
+                        else:
+                            print("  Missing tooth top ref", ref_top_name)
 
-                    # Eyelids
-                    for id in ["_top", "_bot"]:
-                        bpy.ops.object.mode_set(mode='EDIT')
-                        if get_edit_bone("eyelid" + id + dupli[:-2] + side):
-                            # print("aligning", "eyelid" + id + dupli[:-2] + side,
-                            #      "eyelid" + id + "_ref" + dupli[:-2] + side)
-                            copy_bone_transforms(get_edit_bone("eyelid" + id + "_ref" + dupli[:-2] + side),
-                                                 get_edit_bone("eyelid" + id + dupli[:-2] + side))
+                    if tooth == c_teeth_bot_master_name+dupli:
+                        ref_bot_name = teeth_bot_ref_name+dupli
+                        ref_bot = get_edit_bone(ref_bot_name)
+                        if ref_bot:
+                            current_bone.head = ref_bot.head + (ref_bot.head - ref_bot.tail) / 2
+                            current_bone.tail = ref_bot.tail + (ref_bot.head - ref_bot.tail) / 2
+                        else:
+                            print("  Missing tooth bot ref", ref_top_name)
+                else:
+                    print("  Missing tooth:", tooth)
+                    
+                
+        # cheeks
+        print("  Cheeks...")
+        cheeks = ["c_cheek_smile", "c_cheek_inflate"]
 
-                            # if the eyelids bones have constraints, they're up to date: new alignment needed:
-                            bpy.ops.object.mode_set(mode='POSE')
-                            eyelid_pbone = get_pose_bone("eyelid" + id + dupli[:-2] + side)
+        for side in [".l", ".r"]:
+            for cheek in cheeks:
+                cheek_ref = get_edit_bone(cheek[2:] + "_ref" + dupli[:-2] + side)
+                cheek_bone = get_edit_bone(cheek + dupli[:-2] + side)
+                copy_bone_transforms(cheek_ref, cheek_bone)
 
-                            if len(eyelid_pbone.constraints) > 0:
-                                if eyelid_pbone.constraints[0].type == "TRANSFORM":
-                                    # print("  New eyelids found, aligning", "eyelid" + id + dupli[:-2] + side, "...")
-                                    bpy.ops.object.mode_set(mode='EDIT')
-                                    c_eyel = get_edit_bone("c_eyelid" + id + dupli[:-2] + side)
-                                    eyel = get_edit_bone("eyelid" + id + dupli[:-2] + side)
-                                    eye_offset = get_edit_bone("eye_offset_ref" + dupli[:-2] + side)
-                                    c_eyel.head = eyel.tail + (eyel.tail - eyel.head) * 1.5
-                                    # do not align the eyelid if this setting is disabled
-                                    align_eyelid_rot = True
-                                    head_ref = get_edit_bone("head_ref" + dupli)
-                                    if "eyelid_align_rot" in head_ref:
-                                        align_eyelid_rot = head_ref["eyelid_align_rot"]
-                                    if align_eyelid_rot:
-                                        c_eyel.tail = c_eyel.head + ((eyel.tail - eyel.head) * 0.5)
-                                        c_eyel.roll = eyel.roll
+            if "cheek" in locals():
+                del cheek
 
-                                    # set constraint
-                                    eyelid_speed = 1.0
-                                    if len(head_ref.keys()):
-                                        if "eyelid_speed_fac" in head_ref.keys():
-                                            eyelid_speed = head_ref["eyelid_speed_fac"]
-                                    bpy.ops.object.mode_set(mode='POSE')
-                                    eyelid_pbone = get_pose_bone("eyelid" + id + dupli[:-2] + side)
-                                    cns = eyelid_pbone.constraints[0]
-                                    cns.from_min_z = 0.0
-                                    cns.from_max_z = 1.5
-                                    cns.to_max_x_rot = (1.4 / eyelid_pbone.length) * eyelid_speed
-                                    bpy.ops.object.mode_set(mode='EDIT')
-                                else:
-                                    print("  Old eyelids found, do nothing")
+        # nose
+        print("  Nose...")
+        noses = ["c_nose_01" + dupli, "c_nose_02" + dupli, "c_nose_03" + dupli]
+        for nose in noses:
+            nose_bone = get_edit_bone(nose)
+            ref_name = nose[2:-2] + "_ref" + dupli
+            if "_dupli_" in nose:
+                ref_name = nose[2:-12] + "_ref" + dupli
+            nose_ref = get_edit_bone(ref_name)
+            if nose_ref and nose_bone:
+                copy_bone_transforms(nose_ref, nose_bone)
+
+        if "nose" in locals():
+            del nose
+
+        # chins
+        print("  Chins...")
+        chins = ["c_chin_01" + dupli, "c_chin_02" + dupli]
+        for chin in chins:
+            bone = get_edit_bone(chin)
+            bname = chin[2:-2] + "_ref" + dupli
+            if "_dupli_" in chin:
+                bname = chin[2:-12] + "_ref" + dupli
+            ref_bone = get_edit_bone(bname)
+            if ref_bone and bone:
+                copy_bone_transforms(ref_bone, bone)
+
+
+        # Eyes
+        #   main eye bones
+        #   make list of all eyes bones
+        for eye_side in ['.l', '.r']:
+            c_eye_offset_def_name = c_eye_offset_name + dupli[:-2] + eye_side
+            c_eye_offset = get_edit_bone(c_eye_offset_def_name)
+        
+            if c_eye_offset:
+                print("  Eyes ", eye_side)
+                eyes = []
+                init_selection(c_eye_offset_def_name)
+            
+                bpy.ops.armature.select_similar(type='CHILDREN')
+            
+                for eb in get_selected_edit_bones()[:]:                    
+                    eyes.append(eb.name[:-2])
+
+                # direct copy from ref        
+                for eye_name in eyes:
+                    # do not align main c_eyelid now, after
+                    if eye_name == "c_eyelid_top" or eye_name == "c_eyelid_bot":
+                        continue
+                        
+                    ref_name = eye_name.replace('c_', '') + "_ref" + eye_side
+                    cname = eye_name + dupli[:-2] + eye_side
+                    if "_dupli_" in eye_name:
+                        ref_name = eye_name.replace('c_', '')[:-10] + "_ref" + dupli[:-2] + eye_side
+                        cname = eye_name[:-10] + dupli[:-2] + eye_side
+
+                    bone_ref = get_edit_bone(ref_name)
+                    current_bone = get_edit_bone(cname)
+
+                    if bone_ref and current_bone:
+                        copy_bone_transforms(bone_ref, current_bone)
+                    else:
+                        if scn.arp_debug_mode:
+                            print("Bones don't exist:", ref_name, cname)
+
+                
+                # Eyelids
+                for id in ["_top", "_bot"]:
+                    bpy.ops.object.mode_set(mode='EDIT')
+                    
+                    eyelid_name = "eyelid" + id + dupli[:-2] + eye_side
+                    eyelid_eb = get_edit_bone(eyelid_name)
+                    
+                    if eyelid_eb:         
+                        eyelid_ref_eb = get_edit_bone("eyelid" + id + "_ref" + dupli[:-2] + eye_side)
+                        copy_bone_transforms(eyelid_ref_eb, eyelid_eb)
+
+                        # if the eyelids bones have constraints, they're up to date: new alignment needed
+                        
+                        bpy.ops.object.mode_set(mode='POSE')
+                        
+                        eyelid_pb = get_pose_bone(eyelid_name)
+
+                        if len(eyelid_pb.constraints):
+                            if eyelid_pb.constraints[0].type == "TRANSFORM":
+                            
+                                bpy.ops.object.mode_set(mode='EDIT')
+                                
+                                c_eyel_name = "c_eyelid" + id + dupli[:-2] + eye_side
+                                c_eyel = get_edit_bone(c_eyel_name)                                
+                                eyelid_eb = get_edit_bone(eyelid_name)                                
+                                eye_offset_def_name = "eye_offset_ref" + dupli[:-2] + eye_side
+                                eye_offset = get_edit_bone(eye_offset_def_name)
+                                
+                                c_eyel.head = eyelid_eb.tail + (eyelid_eb.tail - eyelid_eb.head) * 1.5
+                                # do not align the eyelid if this setting is disabled
+                                align_eyelid_rot = True
+                                head_ref = get_edit_bone(head_ref_name + dupli)
+                                if "eyelid_align_rot" in head_ref.keys():
+                                    align_eyelid_rot = head_ref["eyelid_align_rot"]
+                                if align_eyelid_rot:
+                                    c_eyel.tail = c_eyel.head + ((eyelid_eb.tail - eyelid_eb.head) * 0.5)
+                                    c_eyel.roll = eyelid_eb.roll
+
+                                # set constraint
+                                eyelid_speed = 1.0                             
+                                if "eyelid_speed_fac" in head_ref.keys():
+                                    eyelid_speed = head_ref["eyelid_speed_fac"]
+                                    
+                                bpy.ops.object.mode_set(mode='POSE')
+                                
+                                eyelid_pb_name = "eyelid" + id + dupli[:-2] + eye_side
+                                eyelid_pb = get_pose_bone(eyelid_pb_name)
+                                cns = eyelid_pb.constraints[0]
+                                cns.from_min_z = 0.0
+                                cns.from_max_z = 1.5
+                                cns.to_max_x_rot = (1.4 / eyelid_pb.length) * eyelid_speed
+                                
+                                bpy.ops.object.mode_set(mode='EDIT')
                             else:
                                 print("  Old eyelids found, do nothing")
-                        else:
-                            print("  eyelid" + id + dupli[:-2] + side, "not found!")
+                        else:                            
+                            print("  Old eyelids found, do nothing")
+                    else:
+                        print("  eyelid" + id + dupli[:-2] + eye_side, "not found!")
 
-                    if "id" in locals():
-                        del id
+              
+        #   additional eye bones
+        eye_additions = ["c_eye", "c_eye_ref_track", "c_eyelid_base", "c_eye_ref"]
+        
+        bpy.ops.object.mode_set(mode='EDIT')
+        
+        for eye_side in ['.l', '.r']:
+            for bname in eye_additions:
+                current_bone_name = bname + dupli[:-2] + eye_side
+                current_bone = get_edit_bone(current_bone_name)
+                eye_offset_ref_name = "eye_offset_ref" + dupli[:-2] + eye_side
+                eye_reference = get_edit_bone(eye_offset_ref_name)
+                
+                if current_bone == None or eye_reference == None:
+                    continue
+                    
+                copy_bone_transforms(eye_reference, current_bone)
 
-                eye_additions = ["c_eye", "c_eye_ref_track", "c_eyelid_base", "c_eye_ref"]
+                if bname == 'c_eye_ref':
+                    current_bone.head = eye_reference.tail + (eye_reference.tail - eye_reference.head)
+                    current_bone.tail = current_bone.head
+                    current_bone.tail[2] += -0.006
+                if bname == 'c_eye_ref_track':
+                    current_bone.tail = current_bone.head + (current_bone.tail - current_bone.head) / 2
 
-                #  additional bones
-                bpy.ops.object.mode_set(mode='EDIT')
+                    
+        eye_target_x_name = "c_eye_target" + dupli
+        eye_target_x = get_edit_bone(eye_target_x_name)
+        
+        if eye_target_x:
+            # get the distance between the two eyes for correct shape scale
+            eye_l = get_edit_bone("c_eye_target" + dupli[:-2] + ".l")
+            eye_r = get_edit_bone("c_eye_target" + dupli[:-2] + ".r")
+            eyesballs_dist = 0.1
+
+            # Set the eye target distance according to the head size
+            custom_dist = 1.0
+            head_ref = get_edit_bone(head_ref_name + dupli)
+            if head_ref.get("eye_target_dist"):
+                custom_dist = head_ref.get("eye_target_dist")
+
+            dist_from_head = (head_ref.tail - head_ref.head).magnitude * custom_dist
+
+            # Set the eye target scale according to the eyeballs distance
+            if eye_l and eye_r:
+                eyesballs_dist = (eye_l.head - eye_r.head).magnitude
+            elif (eye_l == None and eye_r) or (eye_r == None and eye_l):# cyclope mode             
+                eyesballs_dist = (head_ref.tail - head_ref.head).magnitude * 0.5
+           
+            print("  Eyeball dist:", eyesballs_dist)
+
+            if scn.arp_retro_eyes:
+                # old eyes alignment, leads to issues
                 for side in [".l", ".r"]:
-                    for bone in eye_additions:
-                        current_bone = get_edit_bone(bone + dupli[:-2] + side)
-                        eye_reference = get_edit_bone("eye_offset_ref" + dupli[:-2] + side)
-                        copy_bone_transforms(eye_reference, current_bone)
+                    eye_ref = get_edit_bone("eye_offset_ref" + dupli[:-2] + side)
+                    # .x
+                    eye_target_x.head = eye_ref.head.copy()
+                    eye_target_x.head[0] = 0.0
+                    eye_target_x.head[1] += -dist_from_head
+                    eye_target_x.tail = eye_target_x.head
+                    eye_target_x.tail[2] += 0.5 * eyesballs_dist
 
-                        if bone == 'c_eye_ref':
-                            current_bone.head = eye_reference.tail + (eye_reference.tail - eye_reference.head)
-                            current_bone.tail = current_bone.head
-                            current_bone.tail[2] += -0.006
-                        if bone == 'c_eye_ref_track':
-                            current_bone.tail = current_bone.head + (current_bone.tail - current_bone.head) / 2
+                    # .l and .r
+                    eye_target_side = get_edit_bone("c_eye_target" + dupli[:-2] + side)
+                    if round(eye_ref.head[0], 4) == round(eye_ref.tail[0], 4) and round(eye_ref.head[2], 4) == round(eye_ref.tail[2], 4):# if the eye is aligned vert/hor
+                        print("\n    Aligned eye:", eye_ref.name)
+                        eye_target_side.head = eye_target_x.head
+                        eye_target_side.head[0] = eye_ref.head[0]
+                        eye_target_side.tail = eye_target_side.head
+                        eye_target_side.tail[2] = eye_target_x.tail[2]
+                    else:
+                        print("\n    Non-aligned eye:", eye_ref.name, round(eye_ref.head[0], 4), round(eye_ref.tail[0], 4), round(eye_ref.head[2], 4), round(eye_ref.tail[2], 4))
+                        eye_target_side.head = eye_ref.head + (eye_ref.tail - eye_ref.head) * 10
+                        eye_target_side.tail = eye_target_side.head
+                        eye_target_side.tail[2] += 0.05
 
-                    if "bone" in locals():
-                        del bone
+                eye_target_x.head[0] = (eye_l.head[0] + eye_r.head[0]) * 0.5
+                eye_target_x.tail[0] = eye_target_x.head[0]
 
-                eye_target_x = get_edit_bone("c_eye_target" + dupli)
-
-                # get the distance between the two eyes for correct shape scale
-                eye_l = get_edit_bone("c_eye_target" + dupli[:-2] + ".l")
-                eye_r = get_edit_bone("c_eye_target" + dupli[:-2] + ".r")
-                eyesballs_dist = 0.1
-
-                # Set the eye target distance according to the head size
-                custom_dist = 1.0
-                head_ref = get_edit_bone("head_ref" + dupli)
-                if head_ref.get("eye_target_dist"):
-                    custom_dist = head_ref.get("eye_target_dist")
-
-                dist_from_head = (head_ref.tail - head_ref.head).magnitude * custom_dist
-
-                # Set the eye target scale according to the eyeballs distance
-                if eye_l and eye_r:
-                    eyesballs_dist = (eye_l.head - eye_r.head).magnitude
-
-                print("  Eyeball dist:", eyesballs_dist)
-
-                if bpy.context.scene.arp_retro_eyes:
-                    # old eyes alignment, leads to issues
-                    for side in [".l", ".r"]:
-                        eye_ref = get_edit_bone("eye_offset_ref" + dupli[:-2] + side)
-                        # .x
-                        eye_target_x.head = eye_ref.head
-                        eye_target_x.head[0] = 0.0
-                        eye_target_x.head[1] += -dist_from_head
-                        eye_target_x.tail = eye_target_x.head
-                        eye_target_x.tail[2] += 0.5 * eyesballs_dist
-
-                        # .l and .r
-                        eye_target_side = get_edit_bone("c_eye_target" + dupli[:-2] + side)
-                        if round(eye_ref.head[0], 4) == round(eye_ref.tail[0], 4) and round(eye_ref.head[2], 4) == round(eye_ref.tail[2], 4):# if the eye is aligned vert/hor
-                            print("\n    Aligned eye:", eye_ref.name)
-                            eye_target_side.head = eye_target_x.head
-                            eye_target_side.head[0] = eye_ref.head[0]
-                            eye_target_side.tail = eye_target_side.head
-                            eye_target_side.tail[2] = eye_target_x.tail[2]
-                        else:
-                            print("\n    Non-aligned eye:", eye_ref.name, round(eye_ref.head[0], 4), round(eye_ref.tail[0], 4), round(eye_ref.head[2], 4), round(eye_ref.tail[2], 4))
-                            eye_target_side.head = eye_ref.head + (eye_ref.tail - eye_ref.head) * 10
-                            eye_target_side.tail = eye_target_side.head
-                            eye_target_side.tail[2] += 0.05
-
-                    eye_target_x.head[0] = (eye_l.head[0] + eye_r.head[0]) * 0.5
-                    eye_target_x.tail[0] = eye_target_x.head[0]
-
-                else:
-                    # new eyes alignment
-                    # get the eyes center position and mid vector
-                    eyes_center = None
-                    eyes_mid_dir = None
-                    eye_ref_l = get_edit_bone("eye_offset_ref" + dupli[:-2] + ".l")
-                    eye_ref_r = get_edit_bone("eye_offset_ref" + dupli[:-2] + ".r")
+            else:
+                # new eyes alignment
+                # get the eyes center position and mid vector
+                eyes_center = None
+                eyes_mid_dir = None
+                eye_ref_l = get_edit_bone("eye_offset_ref" + dupli[:-2] + ".l")
+                eye_ref_r = get_edit_bone("eye_offset_ref" + dupli[:-2] + ".r")
+                
+                if eye_ref_l and eye_ref_r:# both eyes are enabled
                     eyes_center = (eye_ref_l.head + eye_ref_r.head) * 0.5
                     eyes_mid_dir = (eye_ref_l.y_axis.normalized() + eye_ref_r.y_axis.normalized()) * 0.5
 
@@ -19856,98 +20174,127 @@ def _align_spine_limbs():
                     eye_ref_z_median = (eye_ref_l.z_axis + eye_ref_r.z_axis)*0.5
                     eye_target_x.tail = eye_target_x.head + (eye_ref_z_median.normalized() * 0.5 * eyesballs_dist)
                     align_bone_x_axis(eye_target_x, eyes_mid_dir)
+                    
                     # set c_eye_target.l/.r
-                    for side in [".l", ".r"]:
-                        eye_ref = get_edit_bone("eye_offset_ref" + dupli[:-2] + side)
-                        eye_target_side = get_edit_bone("c_eye_target" + dupli[:-2] + side)
+                    for eye_side in [".l", ".r"]:
+                        eye_ref = get_edit_bone("eye_offset_ref" + dupli[:-2] + eye_side)
+                        eye_target_side = get_edit_bone("c_eye_target" + dupli[:-2] + eye_side)
                         eye_target_side.head = eye_ref.head + (eye_ref.y_axis.normalized() * dist_from_head)
                         eye_target_side.tail = eye_target_side.head + (eye_ref.z_axis.normalized() * (eye_target_x.tail - eye_target_x.head).magnitude)
                         align_bone_x_axis(eye_target_side, eye_ref.y_axis)
-                        if side == ".r":
+                        if eye_side == ".r":
                             eye_target_side.roll += radians(180)
+                            
+                elif (eye_ref_l == None and eye_ref_r) or (eye_ref_r == None and eye_ref_l):# cyclope mode
+                    eye_ref = eye_ref_l if eye_ref_r == None else eye_ref_r
+                    eyes_center = eye_ref.head.copy()
+                    eyes_dir = eye_ref.y_axis.normalized()
+                    
+                    # set c_eye_target.x
+                    eye_target_x.head = eyes_center + (eyes_dir * dist_from_head)
+                    eye_ref_z = eye_ref.z_axis
+                    eye_target_x.tail = eye_target_x.head + (eye_ref_z.normalized() * 0.33 * eyesballs_dist)
+                    align_bone_x_axis(eye_target_x, eyes_dir)
+                    
+                    # set c_eye_target.l/.r 
+                    cyclope_side = eye_ref.name[-2:]
+                    eye_ref = get_edit_bone("eye_offset_ref" + dupli[:-2] + cyclope_side)
+                    eye_target_side = get_edit_bone("c_eye_target" + dupli[:-2] + cyclope_side)
+                    eye_target_side.head = eye_ref.head + (eye_ref.y_axis.normalized() * dist_from_head)
+                    eye_target_side.tail = eye_target_side.head + (eye_ref.z_axis.normalized() * (eye_target_x.tail - eye_target_x.head).magnitude)
+                    align_bone_x_axis(eye_target_side, eye_ref.y_axis)
+                    if cyclope_side == ".r":
+                        eye_target_side.roll += radians(180)
+                    
+        
+        # eye spec target
+        for eye_side in [".l", ".r"]:
+            eye_spec_name = 'c_eye_ref_target' + dupli[:-2] + eye_side
+            eye_spec = get_edit_bone(eye_spec_name)
+            if  eye_spec:        
+                eye_target_name = 'c_eye_target' + dupli[:-2] + eye_side
+                eye_target = get_edit_bone(eye_target_name)
+                if eye_target:
+                    eye_spec.head = eye_target.head.copy()
+                    eye_spec.tail = eye_target.head + (eye_target.tail - eye_target.head) * 0.75
+                    eye_spec.roll = eye_target.roll
 
-                # eye spec target
-                for side in [".l", ".r"]:
-                    if get_edit_bone('c_eye_ref_target' + dupli[:-2] + side) != None:
-                        eye_spec = get_edit_bone('c_eye_ref_target' + dupli[:-2] + side)
-                        eye_target = get_edit_bone('c_eye_target' + dupli[:-2] + side)
-                        eye_spec.head = eye_target.head
-                        eye_spec.tail = eye_target.head + (eye_target.tail - eye_target.head) * 0.75
-                        eye_spec.roll = eye_target.roll
+            else:
+                print("  No eye ref targets ")
 
-                    else:
-                        print("  No eye ref targets ")
-
-                        # eyebrows
-                eyebrows = []
-                # make list of eyebrows
-                init_selection("eyebrow_full_ref" + dupli[:-2] + ".l")
+        # Eyebrows
+        for eyeb_side in [".l", ".r"]:
+            eyebrows = []
+            # make list of eyebrows
+            eyeb_full_ref_name = "eyebrow_full_ref" + dupli[:-2] + eyeb_side
+            eyeb_full_ref = get_edit_bone(eyeb_full_ref_name)
+        
+            if eyeb_full_ref:
+                init_selection(eyeb_full_ref_name)
+            
                 bpy.ops.armature.select_similar(type='CHILDREN')
-                for bone in get_selected_edit_bones()[:]:
-                    if not ".r" in bone.name:  # fingers only and left side only
-                        eyebrows.append(bone.name[:-2])
+            
+                for bone in get_selected_edit_bones()[:]:                  
+                    eyebrows.append(bone.name[:-2])
+            
+                for eyebrow in eyebrows:
+                    eyeb_name = "c_" + eyebrow[:-4] + dupli[:-2] + eyeb_side
+                    ref_name = eyebrow + dupli[:-2] + eyeb_side
+                    if "_dupli" in eyebrow:
+                        eyeb_name = "c_" + eyebrow[:-14] + dupli[:-2] + eyeb_side
+                        ref_name = eyebrow[:-10] + dupli[:-2] + eyeb_side
 
-                if "bone" in locals():
-                    del bone
+                    current_bone = get_edit_bone(eyeb_name)
+                    bone_ref = get_edit_bone(ref_name)
+                    current_bone.head = bone_ref.head
+                    current_bone.tail = bone_ref.tail
+                    current_bone.roll = bone_ref.roll
 
-                for side in [".l", ".r"]:
-                    for eyebrow in eyebrows:
-                        eyeb_name = "c_" + eyebrow[:-4] + dupli[:-2] + side
-                        ref_name = eyebrow + dupli[:-2] + side
-                        if "_dupli" in eyebrow:
-                            eyeb_name = "c_" + eyebrow[:-14] + dupli[:-2] + side
-                            ref_name = eyebrow[:-10] + dupli[:-2] + side
+                # Eyebrows Type 2
+                #   additional auto rot bones
+                eyebrow_01_end = get_edit_bone("eyebrow_01_end" + dupli[:-2] + eyeb_side)
+                if eyebrow_01_end:
+                    refb = get_edit_bone("eyebrow_01_end_ref" + dupli[:-2] + eyeb_side)
+                    eyebrow_01_end.head = refb.head
+                    eyebrow_01_end.tail = refb.head + (refb.tail - refb.head) * 0.75
+                    eyebrow_01_end.roll = refb.roll
 
-                        current_bone = get_edit_bone(eyeb_name)
-                        bone_ref = get_edit_bone(ref_name)
-                        current_bone.head = bone_ref.head
-                        current_bone.tail = bone_ref.tail
-                        current_bone.roll = bone_ref.roll
+                eyebrow_01_target = get_edit_bone("eyebrow_01_end_target" + dupli[:-2] + eyeb_side)
+                if eyebrow_01_target:
+                    refb = get_edit_bone("eyebrow_01_end_ref" + dupli[:-2] + eyeb_side)
+                    eyeb2 = get_edit_bone("eyebrow_01_ref" + dupli[:-2] + eyeb_side)
+                    eyebrow_01_target.head = project_point_onto_plane(refb.head, eyeb2.head, refb.z_axis)
+                    eyebrow_01_target.tail = eyebrow_01_target.head + (refb.tail - refb.head)
+                    eyebrow_01_target.roll = refb.roll
 
-                    # Eyebrows Type 2
-                    # additional auto rot bones
-                    eyebrow_01_end = get_edit_bone("eyebrow_01_end" + dupli[:-2] + side)
-                    if eyebrow_01_end:
-                        refb = get_edit_bone("eyebrow_01_end_ref" + dupli[:-2] + side)
-                        eyebrow_01_end.head = refb.head
-                        eyebrow_01_end.tail = refb.head + (refb.tail - refb.head) * 0.75
-                        eyebrow_01_end.roll = refb.roll
+                # Eyebrows Type 3 (offsets)
+                #   master
+                c_eyeb_offset_full = get_edit_bone("c_eyebrow_offset_full" + dupli[:-2] + eyeb_side)
+                if c_eyeb_offset_full:
+                    refb = get_edit_bone("eyebrow_full_ref" + dupli[:-2] + eyeb_side)
+                    c_eyeb_offset_full.head, c_eyeb_offset_full.tail, c_eyeb_offset_full.roll = refb.head.copy(), refb.tail.copy(), refb.roll
+                    c_eyeb_offset_full.tail = c_eyeb_offset_full.head + (
+                            c_eyeb_offset_full.tail - c_eyeb_offset_full.head) * 0.9  # make it slightly smaller to better see it in the viewport
 
-                    eyebrow_01_target = get_edit_bone("eyebrow_01_end_target" + dupli[:-2] + side)
-                    if eyebrow_01_target:
-                        refb = get_edit_bone("eyebrow_01_end_ref" + dupli[:-2] + side)
-                        eyeb2 = get_edit_bone("eyebrow_01_ref" + dupli[:-2] + side)
-                        eyebrow_01_target.head = project_point_onto_plane(refb.head, eyeb2.head, refb.z_axis)
-                        eyebrow_01_target.tail = eyebrow_01_target.head + (refb.tail - refb.head)
-                        eyebrow_01_target.roll = refb.roll
+                #   others
+                for eyebrow in eyebrows:
+                    offset_name = "c_" + eyebrow[:-4] + "_offset" + dupli[:-2] + eyeb_side
+                    ref_name = eyebrow + dupli[:-2] + eyeb_side
+                    if "_dupli" in eyebrow:
+                        offset_name = "c_" + eyebrow[:-14] + "_offset" + dupli[:-2] + eyeb_side
+                        ref_name = eyebrow[:-10] + dupli[:-2] + eyeb_side
 
-                        # Eyebrows Type 3 (offsets)
-                        # master
-                    c_eyeb_offset_full = get_edit_bone("c_eyebrow_offset_full" + dupli[:-2] + side)
-                    if c_eyeb_offset_full:
-                        refb = get_edit_bone("eyebrow_full_ref" + dupli[:-2] + side)
-                        c_eyeb_offset_full.head, c_eyeb_offset_full.tail, c_eyeb_offset_full.roll = refb.head.copy(), refb.tail.copy(), refb.roll
-                        c_eyeb_offset_full.tail = c_eyeb_offset_full.head + (
-                                c_eyeb_offset_full.tail - c_eyeb_offset_full.head) * 0.9  # make it slightly smaller to better see it in the viewport
-
-                        # others
-                    for eyebrow in eyebrows:
-                        offset_name = "c_" + eyebrow[:-4] + "_offset" + dupli[:-2] + side
-                        ref_name = eyebrow + dupli[:-2] + side
-                        if "_dupli" in eyebrow:
-                            offset_name = "c_" + eyebrow[:-14] + "_offset" + dupli[:-2] + side
-                            ref_name = eyebrow[:-10] + dupli[:-2] + side
-
-                        current_bone = get_edit_bone(offset_name)
-                        bone_ref = get_edit_bone(ref_name)
-                        if current_bone == None or bone_ref == None:
-                            # print("  Bones not found:", offset_name, current_bone, ref_name, bone_ref)
-                            continue
-                        current_bone.head = bone_ref.head
-                        current_bone.tail = bone_ref.tail
-                        current_bone.tail = current_bone.head + (
-                                current_bone.tail - current_bone.head) * 0.9  # make it slightly smaller to better see it in the viewport
-                        current_bone.roll = bone_ref.roll
+                    current_bone = get_edit_bone(offset_name)
+                    bone_ref = get_edit_bone(ref_name)
+                    if current_bone == None or bone_ref == None:
+                        # print("  Bones not found:", offset_name, current_bone, ref_name, bone_ref)
+                        continue
+                    current_bone.head = bone_ref.head
+                    current_bone.tail = bone_ref.tail
+                    current_bone.tail = current_bone.head + (
+                            current_bone.tail - current_bone.head) * 0.9  # make it slightly smaller to better see it in the viewport
+                    current_bone.roll = bone_ref.roll
+                    
 
         # Subnecks
         has_subnecks = False
@@ -19995,6 +20342,7 @@ def _align_spine_limbs():
             neck_vec =  neck_ref.tail - first_subneck.head
             align_neck_master(_neck_master=c_neck_master, _origin=neck_origin, _neck_vec=neck_vec, _neck_ref=neck_ref, _parent=first_subneck.parent)
 
+            
     print("\n Aligning ears")
     for dupli in limb_sides.ear_sides:
 
@@ -20044,12 +20392,12 @@ def _align_spine_limbs():
     # if breast enabled
     if get_edit_bone('c_breast_01.l'):
         print('\n Aligning breasts...')
-        breasts = ["c_breast_01", "c_breast_02"]
+        breasts = ard.breast_bones
 
         for side in [".l", ".r"]:
-            for bone in breasts:
-                control_bone = get_edit_bone(bone + side)
-                ref_bone = get_edit_bone(bone[2:] + "_ref" + side)
+            for bname in breasts:
+                control_bone = get_edit_bone(bname + side)
+                ref_bone = get_edit_bone(bname[2:] + "_ref" + side)
 
                 if ref_bone and control_bone:
                     # set transforms
@@ -20057,10 +20405,7 @@ def _align_spine_limbs():
 
                     # set parents
                     # if the reference bones are parented to the spine bones, find the matching bone for the control bones parent
-                    """
-                    parent_dict = {'spine_01_ref.x': ['c_spine_01_bend.x', 'spine_01.x', 'c_spine_01.x'], 'spine_02_ref.x': ['c_spine_02_bend.x', 'spine_02.x', 'c_spine_02.x'],
-                                   'spine_03_ref.x': ['c_spine_03_bend.x', 'spine_03.x', 'c_spine_03.x'], 'root_ref.x': ['root.x']}
-                    """
+                  
                     if ref_bone.parent:
                         ref_parent_name = ref_bone.parent.name
                         
@@ -20089,17 +20434,10 @@ def _align_spine_limbs():
                                     if parent_bone:
                                         control_bone.parent = parent_bone
                                         break
-                        """
-                        if ref_parent_name in parent_dict:
-                            for parent_name in parent_dict[ref_parent_name]:
-                                corresponding_parent = get_edit_bone(parent_name)
-                                if corresponding_parent:
-                                    control_bone.parent = corresponding_parent
-                                    break
-                        """            
+                       
                     # if there's no parent assigned, find the default parent bone
                     else:
-                        default_parent = get_edit_bone('c_spine_02_bend.x')
+                        default_parent = get_edit_bone(ard.get_spine_name('control_bend', 2))#('c_spine_02_bend.x')
                         default_parent_traj = get_edit_bone(get_first_master_controller())
                         if default_parent:
                             control_bone.parent = default_parent
@@ -20107,26 +20445,24 @@ def _align_spine_limbs():
                             control_bone.parent = default_parent_traj
 
                 else:
-                    if bpy.context.scene.arp_debug_mode == True:
+                    if scn.arp_debug_mode:
                         print("No breasts found, skip it")
 
-            if "bone" in locals():
-                del bone
-
+                        
     # switch pose state and mode
     bpy.ops.object.mode_set(mode='POSE')
 
     # set c_neck_01 pose mode params
     for dupli in limb_sides.head_sides:
-        neck_01_pbone = get_pose_bone("c_neck_01" + dupli)
-        neck_pbone = get_pose_bone("c_neck" + dupli)
+        neck_01_pbone = get_pose_bone(c_neck_01_name[:-2] + dupli)
+        neck_pbone = get_pose_bone(c_neck_name[:-2] + dupli)
         if neck_01_pbone:
             # Euler
             neck_01_pbone.rotation_mode = "XYZ"
             # custom shape
-            neck_01_pbone.custom_shape = bpy.data.objects.get("cs_torus_03")
+            neck_01_pbone.custom_shape = get_object("cs_torus_03")
             neck_01_pbone.bone.show_wire = True
-            neck_01_pbone.custom_shape_transform = get_pose_bone("c_p_neck_01" + dupli)
+            neck_01_pbone.custom_shape_transform = get_pose_bone(c_p_neck_01_name[:-2] + dupli)
             # group
             if neck_pbone:
                 neck_01_pbone.bone_group = neck_pbone.bone_group
@@ -20137,18 +20473,18 @@ def _align_spine_limbs():
             cont_subneck = get_pose_bone('c_subneck_' + str(i) + dupli)
             if cont_subneck:
                 if cont_subneck.custom_shape == None:
-                    cont_subneck.custom_shape = bpy.data.objects.get("cs_torus_03")
+                    cont_subneck.custom_shape = get_object("cs_torus_03")
 
-    if bpy.context.scene.arp_debug_mode == True:
+    if scn.arp_debug_mode == True:
         print("\n FINISH ALIGNING SPINE BONES...\n")
 
-    if bpy.context.scene.arp_debug_mode == True:
+    if scn.arp_debug_mode == True:
         print("\n COPY BONES TO RIG ADD ")
 
-    if bpy.context.active_object.arp_secondary_type == "ADDITIVE" and rig_add:
+    if rig.arp_secondary_type == "ADDITIVE" and rig_add:
         copy_bones_to_rig_add(rig, rig_add)
 
-    if bpy.context.scene.arp_debug_mode == True:
+    if scn.arp_debug_mode == True:
         print("\n FINISHED COPYING TO RIG ADD ")
 
     # --END ALIGN SPINE BONES
@@ -20206,7 +20542,7 @@ def set_draw_scale(name, size):
     set_custom_shape_scale(bone, size)
 
 
-def is_facial_enabled(armature_object):
+def is_facial_enabled(armature_object):   
     if armature_object.type == "ARMATURE":
         if armature_object.data.bones.get("jaw_ref.x"):
             return True
@@ -22250,7 +22586,7 @@ def reset_spline_stretch_ctrl(name, side_arg):
         cns.rest_length = 0.0
         
         
-def set_tail(tail_count, master_at_root=False, side_arg=None):
+def set_tail(tail_count, master_at_root=True, side_arg=None, new_side='.x', update_transforms=True):
     context = bpy.context
     current_mode = context.mode
     active_bone = None
@@ -22274,7 +22610,7 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
 
     # Show all layers
     layers_select = enable_all_armature_layers()
-    
+   
     # get the bone side     
     side = '.x'
     if side_arg:
@@ -22292,6 +22628,7 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
     c_root_master_name = ard.spine_bones_dict['c_root_master']
     c_root_name = ard.spine_bones_dict['c_root']
     
+    
     # Get the last existing tail bone position to position bones later
     last_existing_tail = None
     for i in range(0, 32):
@@ -22300,9 +22637,8 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
         if tail_ref:
             last_existing_tail = tail_ref.tail.copy()
     
-    print('last_existing_tail', last_existing_tail)
-            
-    current_tail_count = None   
+    print('last_existing_tail', last_existing_tail)            
+    
     tail_bones_list = []
     created_tail_bones = []
     
@@ -22328,13 +22664,22 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
             
         created_tail_bones.append(first_tail_ref_name)
             
+    # update bone transforms if the count has changed
+    if 'tail_count' in first_tail_ref.keys():
+        if tail_count != first_tail_ref['tail_count']:
+            update_transforms = True
+        
+    # save tails setting in props
+    first_tail_ref["master_at_root"] = master_at_root
+    first_tail_ref["tail_count"] = tail_count
+    first_tail_ref["tail_side"] = new_side
+    first_tail_ref["tail_update_transforms"] = update_transforms
     
     # If the c_tail_00 bone does not exist, create it first    
     c_tail_0_name = 'c_tail_00'+side
     
     if get_edit_bone(c_tail_0_name) == None:    
-        new_tail_cont = rig.data.edit_bones.new(c_tail_0_name)
-        new_tail_cont.use_deform = False
+        new_tail_cont = create_edit_bone(c_tail_0_name)        
         new_tail_cont.head = root.head + (-root.z_axis.normalized() * (root.tail - root.head).magnitude)
         new_tail_cont.tail = new_tail_cont.head + (-root.z_axis.normalized() * (root.tail - root.head).magnitude * 4)
         new_tail_cont.use_deform = True
@@ -22366,7 +22711,7 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
         tail_ref_name = "tail_" + tail_id + "_ref"+side
         tail_ref = get_edit_bone(tail_ref_name)
         if tail_ref == None:
-            tail_ref = rig.data.edit_bones.new(tail_ref_name) 
+            tail_ref = create_edit_bone(tail_ref_name) 
             
             if not tail_ref_name in created_tail_bones:
                 created_tail_bones.append(tail_ref_name)
@@ -22378,7 +22723,8 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
         c_tail_name = "c_tail_" + tail_id + side
         tail_control = get_edit_bone(c_tail_name)
         if tail_control == None:
-            tail_control = rig.data.edit_bones.new(c_tail_name)
+            tail_control = create_edit_bone(c_tail_name, deform=True)
+            tail_control.head, tail_control.tail = [0,0,0], [1,1,1]# temp coords
             
             if not c_tail_name in created_tail_bones:
                 created_tail_bones.append(c_tail_name)
@@ -22389,13 +22735,11 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
         tail_bones_list.append(c_tail_name)
 
         # position the tail ref
-        tail_ref.head = tail_origin + (tail_vec * (i)) / tail_count
-        tail_ref.tail = tail_ref.head + (tail_vec / tail_count)
-        tail_ref.roll = first_tail_ref.roll
-
-        # position the tail controller
-        tail_control.head, tail_control.tail, tail_control.roll = tail_ref.head.copy(), tail_ref.tail.copy(), tail_ref.roll
-
+        if update_transforms:
+            tail_ref.head = tail_origin + (tail_vec * (i)) / tail_count
+            tail_ref.tail = tail_ref.head + (tail_vec / tail_count)
+            tail_ref.roll = first_tail_ref.roll
+       
         # parent the tails
         if tail_ref.parent == None:
             tail_ref.parent = get_edit_bone("tail_" + tail_id_prev + "_ref" + side)
@@ -22420,23 +22764,15 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
 
     # if does not exist, create it if more than 1 tail bone
     if tail_count > 1:
+        created_master = False
         if c_tail_master == None:
-            c_tail_master = rig.data.edit_bones.new(c_tail_master_name)
+            c_tail_master = create_edit_bone(c_tail_master_name)
+            c_tail_master.head, c_tail_master.tail = [0,0,0], [0,0,1]# temp coords
+            created_master = True
             
             if not c_tail_master_name in created_tail_bones:
                 created_tail_bones.append(c_tail_master_name)
-
-        if not master_at_root:
-            c_tail_master.head = tail_origin + (tail_vec * 0.5)
-        else:
-            c_tail_master.head = tail_origin
-
-        # save tails setting in props
-        first_tail_ref["master_at_root"] = master_at_root
-        first_tail_ref["tail_count"] = tail_count
-
-        c_tail_master.tail = c_tail_master.head + (tail_vec * 0.5)
-        c_tail_master.roll = first_tail_ref.roll
+            
         c_tail_master.parent = tail_parent
         c_tail_master.use_deform = False
         tail_bones_list.append(c_tail_master_name)
@@ -22506,6 +22842,10 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
 
     if tail_count > 1:
         c_tail_master_pb = get_pose_bone(c_tail_master_name)
+        
+        for i in range(0,3):
+            c_tail_master_pb.lock_location[i] = True
+        
         if c_tail_master_pb:
             if master_at_root == False:
                 c_tail_master_pb.custom_shape_transform = get_pose_bone(c_tail_0_name)
@@ -22522,35 +22862,15 @@ def set_tail(tail_count, master_at_root=False, side_arg=None):
         eb = get_edit_bone(iname)
         if eb.layers[17]:# ref bones only
             select_edit_bone(iname)
+            
+            
+    # rename with new side
+    for bname in tail_bones_list:
+        eb = get_edit_bone(bname)
+        eb.name = retarget_bone_side(eb.name, side[:-2]+new_side)
 
     # restore saved mode
-    restore_current_mode(current_mode)            
-    
-    '''
-    # Restore selected bone
-    if active_bone:
-        bone_to_select = None
-        if current_mode == 'POSE':
-            if get_pose_bone(active_bone):
-                bone_to_select = get_pose_bone(active_bone).bone
-            else:
-                if get_pose_bone("c_pos"):
-                    bone_to_select = get_pose_bone("c_pos").bone
-
-            if bone_to_select:
-                rig.data.bones.active = bone_to_select
-
-        if current_mode == 'EDIT':
-            bone_to_select = None
-            if get_edit_bone(active_bone):
-                bone_to_select = get_edit_bone(active_bone)
-            else:
-                root_ref = get_edit_bone(root_ref_name)
-                if root_ref:
-                    bone_to_select = root_ref
-            if bone_to_select:
-                rig.data.edit_bones.active = bone_to_select
-    '''
+    restore_current_mode(current_mode)
 
     # Restore layers
     restore_armature_layers(layers_select)
@@ -22708,8 +23028,7 @@ def set_leg_softik(softik_enabled):
     bpy.ops.object.mode_set(mode='EDIT')
     
 
-
-def set_three_bones_leg(enabled):
+def set_three_bones_leg(enabled):   
     # get the bone side
     side = ""
     if len(get_selected_edit_bones()) > 0:
@@ -22758,7 +23077,7 @@ def set_three_bones_leg(enabled):
         thigh_b.use_deform = False
 
 
-def set_leg_ik_offset(enabled):
+def set_leg_ik_offset(enabled):    
     rig = bpy.context.active_object
     bversion = blender_version._float
     
@@ -22769,7 +23088,7 @@ def set_leg_ik_offset(enabled):
         side = get_bone_side(b_name)
     else:
         print("No bone selected")
-
+    
     ik_offset_name = "c_foot_ik_offset" + side
     ch_list = ["c_foot_roll" + side, "c_foot_bank_01" + side, "foot_ik" + side]
 
@@ -22870,6 +23189,86 @@ def set_leg_ik_offset(enabled):
 
         remove_invalid_drivers()
     # end set_leg_ik_offset()
+    
+    
+def set_arm_fk_lock(enabled):
+    print("Setting Arm FK Lock...")
+    side = ""
+    if len(get_selected_edit_bones()):
+        b_name = get_selected_edit_bones()[0].name
+        side = get_bone_side(b_name)
+    else:
+        print("No bone selected, can't set arm_fk_lock")
+        return
+
+    arm_ref_name = (ard.arm_ref_dict['arm'])+side
+    arm_ref = get_edit_bone(arm_ref_name)
+
+    # store setting as custom prop
+    arm_ref['arm_fk_lock'] = enabled
+
+    rig = bpy.context.active_object
+    constraint_name = 'ArmLock'
+    prop_lock_name = 'arm_lock'
+
+    bpy.ops.object.mode_set(mode='POSE')
+
+    c_shoulder_name = (ard.arm_bones_dict['shoulder']['control'])+side
+    c_shoulder = get_pose_bone(c_shoulder_name)
+    c_arm_fk_name = (ard.arm_bones_dict['arm']['control_fk'])+side
+    c_arm_fk = get_pose_bone(c_arm_fk_name)
+
+    if enabled:
+        print("  enabled")
+        # create lock property
+        if not prop_lock_name in c_shoulder.keys():
+            create_custom_prop(node=c_shoulder, prop_name=prop_lock_name, prop_val=1, prop_min=0, prop_max=1, default=1, prop_description="Lock or free the arm FK rotation")
+
+        # add armature constraint
+        cns_arm = c_arm_fk.constraints.get(constraint_name)
+        if cns_arm == None:
+            # create the constraint
+            cns_arm = c_arm_fk.constraints.new("ARMATURE")
+            cns_arm.name = constraint_name
+
+            # move up the constraint first in the stack
+            move_constraint(c_arm_fk, cns_arm, 'UP', len(c_arm_fk.constraints))
+
+        #   add targets
+        print("  add targets")
+        while len(cns_arm.targets) < 2:
+            tar = cns_arm.targets.new()
+            tar.target = rig
+            # set subtarget when Match to Rig, depends on shoulder ref bone parent. Don't set them here
+
+        #   add targets drivers
+        print("  add drivers")
+        for i, tar in enumerate(cns_arm.targets):
+            dr_dp = 'pose.bones["' + c_arm_fk_name + '"].constraints["'+constraint_name+'"].targets['+str(i)+'].weight'
+            tar_dp = 'pose.bones["' + c_shoulder_name + '"].["'+prop_lock_name+'"]'
+            expr = 'var' if i == 0 else '1-var'
+            add_driver_to_prop(rig, dr_dp, tar_dp, exp=expr)
+
+
+    else:# arm lock disabled
+        cns = c_arm_fk.constraints.get(constraint_name)
+        if cns:
+            # remove the constraint drivers
+            for dr in rig.animation_data.drivers:
+                cns_dr_dp = 'pose.bones["' + c_arm_fk_name + '"].constraints["'+constraint_name+'"].'
+                if dr.data_path.startswith(cns_dr_dp):
+                    rig.animation_data.drivers.remove(dr)
+
+            # remove the constraint
+            c_arm_fk.constraints.remove(cns)
+
+        # remove the custom prop
+        if prop_lock_name in c_shoulder.keys():
+            del c_shoulder[prop_lock_name]
+
+
+    bpy.ops.object.mode_set(mode='EDIT')
+    print("Arm FK lock set.")
     
 
 def set_arm_ik_offset(enabled):
@@ -22986,7 +23385,7 @@ def set_arm_ik_offset(enabled):
 
 def set_arm_ikfk_default(value):
     context = bpy.context
-    active_bone_name = context.active_object.data.edit_bones.active.name
+    active_bone_name = context.selected_editable_bones[0].name
     side = get_bone_side(active_bone_name)
     
     hand_ref_name = ard.arm_ref_dict['hand']
@@ -22999,8 +23398,9 @@ def set_arm_ikfk_default(value):
     
     
 def set_leg_ikfk_default(value):
+    
     context = bpy.context
-    active_bone_name = context.active_object.data.edit_bones.active.name
+    active_bone_name = context.selected_editable_bones[0].name
     side = get_bone_side(active_bone_name)
     
     foot_ref_name = ard.leg_ref_bones_dict['foot']
@@ -25528,7 +25928,7 @@ def set_arm_twist(twist_bones_amount, side, bbones_ease_out=None):
 
 def set_leg_twist(twist_bones_amount, side, bbones_ease_out=None):
     bpy.ops.object.mode_set(mode='EDIT')
-
+    
     # disable X mirror
     xmirror_state = bpy.context.object.data.use_mirror_x
     bpy.context.object.data.use_mirror_x = False
@@ -26518,7 +26918,7 @@ def set_eyetargets_distance(eye_target_dist):
     # get the bone side
     side = ""
 
-    if len(get_selected_edit_bones()) > 0:
+    if len(get_selected_edit_bones()):
         b_name = get_selected_edit_bones()[0].name
         side = ".x"
         if '_dupli_' in b_name:
@@ -26558,52 +26958,54 @@ def set_jaw_rotation_location(rot_state, auto_lips_visual, loc_state):
     head_ref["arp_jaw_rotation"] = rot_state
     head_ref["arp_jaw_location"] = loc_state
 
-    bpy.ops.object.mode_set(mode='POSE')
-
+    bpy.ops.object.mode_set(mode='POSE')    
+   
     jaw_pbone = get_pose_bone("jawbone" + side)
-    cns = jaw_pbone.constraints.get("Damped Track")
-    if cns:
-        if rot_state:
-            cns.influence = 0.0
-        else:
-            cns.influence = 1.0
-
-    if auto_lips_visual:  # we need a new transform constraint to make the c_lips_01 follow the jaw rotation
-        for _side in [".l", ".r"]:
-            bname = "lips_top_01_follow" + side_id + _side
-            follow_pbone = get_pose_bone(bname)
-            cns2 = follow_pbone.constraints.get("MoveWithJawRot")
+    
+    if jaw_pbone:
+        cns = jaw_pbone.constraints.get("Damped Track")
+        if cns:
             if rot_state:
-                if cns2 == None:
-                    cns2 = follow_pbone.constraints.new("TRANSFORM")
-                    cns2.name = "MoveWithJawRot"
-                    cns2.target = bpy.context.active_object
-                    cns2.subtarget = "c_jawbone" + side
-                    cns2.use_motion_extrapolate = True
-                    cns2.map_from = "ROTATION"
-                    cns2.map_to = "LOCATION"
-                    cns2.from_max_x_rot = 0.174
-                    cns2.map_to_y_from = "X"
-                    cns2.map_to_x_from = "Y"
-                    cns2.to_max_y = -0.01
-                    cns2.target_space = cns2.owner_space = "LOCAL"
-                    cns2.influence = 0.2
+                cns.influence = 0.0
             else:
-                if cns2:
-                    cns2.influence = 0.0
+                cns.influence = 1.0
 
-    if loc_state:
-        cns_loc = jaw_pbone.constraints.get("jawbone" + side)
-        if cns_loc == None:
-            cns_loc = jaw_pbone.constraints.new("COPY_LOCATION")
-            cns_loc.name = "Copy Location"
-            cns_loc.target = bpy.context.active_object
-            cns_loc.subtarget = "c_jawbone" + side
-            cns_loc.target_space = cns_loc.owner_space = "LOCAL"
-    else:
-        cns_loc = jaw_pbone.constraints.get("jawbone" + side)
-        if cns_loc:
-            jaw_pbone.constraints.remove(cns_loc)
+        if auto_lips_visual:  # we need a new transform constraint to make the c_lips_01 follow the jaw rotation
+            for _side in [".l", ".r"]:
+                bname = "lips_top_01_follow" + side_id + _side
+                follow_pbone = get_pose_bone(bname)
+                cns2 = follow_pbone.constraints.get("MoveWithJawRot")
+                if rot_state:
+                    if cns2 == None:
+                        cns2 = follow_pbone.constraints.new("TRANSFORM")
+                        cns2.name = "MoveWithJawRot"
+                        cns2.target = bpy.context.active_object
+                        cns2.subtarget = "c_jawbone" + side
+                        cns2.use_motion_extrapolate = True
+                        cns2.map_from = "ROTATION"
+                        cns2.map_to = "LOCATION"
+                        cns2.from_max_x_rot = 0.174
+                        cns2.map_to_y_from = "X"
+                        cns2.map_to_x_from = "Y"
+                        cns2.to_max_y = -0.01
+                        cns2.target_space = cns2.owner_space = "LOCAL"
+                        cns2.influence = 0.2
+                else:
+                    if cns2:
+                        cns2.influence = 0.0
+
+        if loc_state:
+            cns_loc = jaw_pbone.constraints.get("jawbone" + side)
+            if cns_loc == None:
+                cns_loc = jaw_pbone.constraints.new("COPY_LOCATION")
+                cns_loc.name = "Copy Location"
+                cns_loc.target = bpy.context.active_object
+                cns_loc.subtarget = "c_jawbone" + side
+                cns_loc.target_space = cns_loc.owner_space = "LOCAL"
+        else:
+            cns_loc = jaw_pbone.constraints.get("jawbone" + side)
+            if cns_loc:
+                jaw_pbone.constraints.remove(cns_loc)
 
     bpy.ops.object.mode_set(mode='EDIT')
 
@@ -26611,8 +27013,9 @@ def set_jaw_rotation_location(rot_state, auto_lips_visual, loc_state):
     # end set_jaw_rotation_location()
 
 
-def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=False, lips_corner_offset=False,
-               eyebrows_type="type_1", lips_masters=False, eyelids_align=True, eyelid_speed=1.0, skulls_align=True, skull_bones=False):
+def set_facial(enable=True, mouth_enabled=True, auto_lips=True, auto_lips_visual=False, lips_offset=False, lips_corner_offset=False, teeth_enabled=True,
+                tongue_enabled=True, eyebrows_type="type_1", lips_masters=False, eyelids_align=True, eyelid_speed=1.0, skulls_align=True, skull_bones=False, 
+               chins_enabled=True, noses_enabled=True, eye_l_enabled=True, eye_r_enabled=True, eyebrow_l_enabled=True, eyebrow_r_enabled=True, cheeks_enabled=True):
 
     print("\nSetting facial...")
 
@@ -26626,7 +27029,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
     # get the bone side
     side = ".x"
 
-    if len(get_selected_edit_bones()) > 0:
+    if len(get_selected_edit_bones()):
         b_name = get_selected_edit_bones()[0].name
         if '_dupli_' in b_name:
             side = b_name[-12:]
@@ -26641,21 +27044,249 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
         return
 
     # save settings in custom props
+    head_ref["facial"] = enable
+    head_ref["auto_lips"] = auto_lips
     head_ref["auto_lips_visual"] = auto_lips_visual
     head_ref["eyelid_align_rot"] = eyelids_align
     head_ref["eyelid_speed_fac"] = eyelid_speed
     head_ref["skulls_align"] = skulls_align
     head_ref["skull_bones"] = skull_bones
-
+    head_ref["mouth_enabled"] = mouth_enabled
+    head_ref["teeth_enabled"] = teeth_enabled
+    head_ref["tongue_enabled"] = tongue_enabled
+    head_ref['chins_enabled'] = chins_enabled
+    head_ref['noses_enabled'] = noses_enabled
+    head_ref['eye_l_enabled'] = eye_l_enabled
+    head_ref['eye_r_enabled'] = eye_r_enabled
+    head_ref['eyebrow_l_enabled'] = eyebrow_l_enabled
+    head_ref['eyebrow_r_enabled'] = eyebrow_r_enabled
+    head_ref['cheeks_enabled'] = cheeks_enabled
+    
+    
     # disable the proxy picker to avoid bugs
     proxy_picker_state = disable_proxy_picker()
 
     # Active all layers
     layers_select = enable_all_armature_layers()
+    
+    
+    def create_eye_target_mid(side):
+        c_eye_target_name = retarget_bone_side(ard.eye_bones_mid[0], side, dupli_only=True)
+        c_eye_target_x = get_edit_bone(c_eye_target_name)
+        if c_eye_target_x == None:
+            # coords
+            c_eye_target_x = create_edit_bone(c_eye_target_name)
+            c_eye_target_x.head, c_eye_target_x.tail = [0,0,0], [0,0,1]
+            set_bone_layer(c_eye_target_x, 0)
+            
+            # target sides parent
+            for s in ['.l', '.r']:
+                print("side", side)
+                c_eye_target_s_name = retarget_bone_side(c_eye_target_name, side[:-2] + s)
+                c_eye_target_s = get_edit_bone(c_eye_target_s_name)
+                print('c_eye_target_s', c_eye_target_s_name)
+                if c_eye_target_s:
+                    c_eye_target_s.parent = c_eye_target_x
+               
+            # pose data
+            bpy.ops.object.mode_set(mode='POSE')
+            
+            c_eye_target_pb = get_pose_bone(c_eye_target_name)
+            c_eye_target_pb.rotation_mode = 'XYZ'
+            set_bone_custom_shape(c_eye_target_pb, 'cs_eye_aim_global')
+            set_custom_shape_scale(c_eye_target_pb, 2.0)            
+            set_bone_color_group(rig, c_eye_target_pb, 'body.x')            
+            
+            cns = c_eye_target_pb.constraints.new('CHILD_OF')
+            cns.target = rig
+            cns.subtarget = retarget_bone_side(ard.heads_dict['deform'], side, dupli_only=True)    
 
+            create_custom_prop(node=c_eye_target_pb, prop_name='eye_target', prop_val=1.0, prop_min=0.0, prop_max=1.0, prop_description="Make the eyes follow the target controllers")
+            
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            
+    def delete_eye_target_mid(side):
+        c_eye_target_name = retarget_bone_side(ard.eye_bones_mid[0], side, dupli_only=True)
+        c_eye_target_x = get_edit_bone(c_eye_target_name)
+        if c_eye_target_x:
+            delete_edit_bone(c_eye_target_x)
+    
+    
+    def set_facial_sublimb(module_name='', active=None, bones_list=None, matrix_ref_bone=None):
+    
+        bpy.ops.object.mode_set(mode='EDIT')
+        
+        if active:            
+            limb_exist = False
+            # check current bones
+            for bname in bones_list:
+                final_bname = retarget_bone_side(bname, side, dupli_only=True)
+                eb = get_data_bone(final_bname)
+                if eb:
+                    limb_exist = True
+                    break                    
+           
+            if not limb_exist:
+                print('Create '+module_name+'...')
+                addon_directory = os.path.dirname(os.path.abspath(__file__))
+                filepath = addon_directory + "/armature_presets/modules.blend"
+           
+                # make a list of current custom shapes objects in the scene for removal later
+                cs_objects = [obj.name for obj in bpy.data.objects if obj.name.startswith("cs_")]
+
+                # load the objects in the blend file data
+                with bpy.data.libraries.load(filepath, link=False) as (data_from, data_to):                 
+                    data_to.objects = [i for i in data_from.objects if i == module_name]
+
+                # link in scene
+                for obj in data_to.objects:
+                    context.scene.collection.objects.link(obj)
+                    print("Linked armature:", obj.name)
+                    
+                bpy.ops.object.mode_set(mode='OBJECT')
+
+                set_active_object(module_name)
+                rig_module = get_object(module_name)
+                
+                bpy.ops.object.mode_set(mode='POSE')
+                
+                for pb in rig_module.pose.bones:
+                    # replace custom shapes by custom shapes already existing in the scene                
+                    if pb.custom_shape:
+                        if pb.custom_shape.name not in cs_objects:
+                            cs_name = pb.custom_shape.name.replace('.001', '')
+                            if cs_name in cs_objects:
+                                set_bone_custom_shape(pb, cs_name)
+                                
+                             
+                    # rename bones with new side
+                    if "_dupli_" in side:
+                        pb.name = retarget_bone_side(pb.name, side, dupli_only=True)
+                        #pb.name = pb.name.split('.')[0] + side[:-2] + pb.name[-2:]# new name = eye + _dupli_001 + .l
+
+                
+                # retarget constraints targets side
+                for pb in rig_module.pose.bones:                
+                    for cns in pb.constraints:
+                        # None target object to current armature                    
+                        if 'target' in dir(cns):
+                            if cns.target == None:
+                                cns.target = get_object(rig_name)
+                     
+                        # Bones (subtarget) default side to current side
+                        if 'subtarget' in dir(cns):
+                            if cns.subtarget != "":
+                                new_subtarget = retarget_bone_side(cns.subtarget, side, dupli_only=True)
+                                if new_subtarget != cns.subtarget:# setting the subtarget can lead to constraints update issues. Only set if necessary
+                                    cns.subtarget = new_subtarget
+                                    
+                
+                # retarget drivers variables side              
+                for dr in rig_module.animation_data.drivers:
+                    if dr.data_path.startswith('pose.bones'):
+                        if "_dupli_" in side:
+                            for var in dr.driver.variables:
+                                for tar in var.targets:
+                                    tar_pbname = get_pbone_name_from_data_path(tar.data_path)
+                                    tar_pbname_retarget = retarget_bone_side(tar_pbname, side, dupli_only=True)
+                                    tar.data_path = tar.data_path.replace(tar_pbname, tar_pbname_retarget)
+                                    #if not side[:-2] in tar.data_path:                                   
+                                    #    tar.data_path = tar.data_path.replace(side[-2:], side[:-2] + side[-2:])
+                                 
+                bpy.ops.object.mode_set(mode='OBJECT')
+                
+                rig_module.matrix_world = rig.matrix_world.copy()
+                
+                # Merge to the main armature
+                bpy.ops.object.select_all(action='DESELECT')
+                set_active_object(module_name)
+                set_active_object(rig_name)
+                bpy.ops.object.mode_set(mode='OBJECT')
+                bpy.ops.object.join()
+
+                bpy.ops.object.mode_set(mode='EDIT')
+              
+                # Move all new facial bones near the head
+                b1 = get_edit_bone(retarget_bone_side(matrix_ref_bone, side, dupli_only=True))
+                
+                if len(b1.keys()):
+                    if "arp_offset_matrix" in b1.keys():   
+                        
+                        head_ref = get_edit_bone(retarget_bone_side(ard.head_ref[0], side, dupli_only=True))
+                        b1_local = Matrix(b1["arp_offset_matrix"]) @ b1.matrix
+
+                        # store children bones matrix                          
+                        children_mat_dict = {}
+                        for child_name in bones_list:
+                            eb = get_edit_bone(retarget_bone_side(child_name, side, dupli_only=True))
+                            if eb == None:
+                                continue
+                            children_mat_dict[eb] = b1.matrix.inverted() @ eb.matrix
+
+                        # move b1
+                        b1.matrix = head_ref.matrix @ b1_local
+                        # move other bones
+                        for child_ in children_mat_dict:
+                            child_.matrix = b1.matrix @ children_mat_dict[child_]
+
+                        # store current bones coords copy in a new dict to avoid the multiple transform issue when bones have connected parent
+                        bones_coords = {}
+                        for b in children_mat_dict:
+                            bones_coords[b] = b.head.copy(), b.tail.copy()
+                        
+                        # scale proportionally to the head bone
+                        scale_from_origin(ed_bone=b1, center=head_ref.head, factor=(head_ref.tail - head_ref.head).magnitude * 4)
+
+                        for eb in bones_coords:
+                            scale_from_origin(ed_bone=eb, center=head_ref.head, head_coords=bones_coords[eb][0],
+                                              tail_coords=bones_coords[eb][1],
+                                              factor=(head_ref.tail - head_ref.head).magnitude * 4)
+                                              
+                parent_lost_bones()
+                
+                # eyes must have a common c_eye_target.x controller
+                if module_name == 'rig_eye_l' or module_name == 'rig_eye_r':
+                    create_eye_target_mid(side)
+                
+                # triggers the driver update
+                for dr in rig.animation_data.drivers:
+                    if dr.data_path.startswith('pose.bones'):
+                        dr.driver.expression += ''
+                        
+                
+                    
+        else:        
+            for bname in bones_list:              
+                final_bname = retarget_bone_side(bname, side, dupli_only=True)
+                eb = get_edit_bone(final_bname)
+                if eb:
+                    delete_edit_bone(eb)
+                        
+    
+    def parent_lost_bones():
+        for eb in rig.data.edit_bones:
+            bside = get_bone_side(eb.name)            
+            if len(eb.keys()) == 0:
+                continue
+            if not "arp_parent" in eb.keys():
+                continue
+            
+            parent_name = retarget_bone_side(eb["arp_parent"], bside, dupli_only=True)
+
+            if parent_name.startswith("c_skull") and not skull_bones:
+                parent_name = retarget_bone_side('head.x', bside, dupli_only=True)     
+            
+            parent_bone = get_edit_bone(parent_name)
+
+            if eb.parent == None or parent_name.startswith("c_skull"):# make sure to parent to skull bones
+                if parent_bone:
+                    eb.parent = parent_bone
+                   
+    '''
     def create_facial():
         exist_already = False
-        if get_edit_bone(ard.facial_ref[0] + side[:-2] + ".l"):
+        if get_edit_bone(ard.facial_ref_dict['cheek_inflate'] + side[:-2] + ".l"):
             exist_already = True
 
         if not exist_already:
@@ -26699,52 +27330,28 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             # retarget constraints targets
             for pb in rig_facial.pose.bones:                
                 for cns in pb.constraints:
-                    # None target object to current armature
-                    try:
+                    # None target object to current armature                    
+                    if 'target' in dir(cns):
                         if cns.target == None:
-                            cns.target = bpy.data.objects[rig_name]
-                    except:
-                        pass
-
+                            cns.target = get_object(rig_name)
+                 
                     # Bones (subtarget) default side to current side
-                    try:
+                    if 'subtarget' in dir(cns):
                         if cns.subtarget != "":
                             new_subtarget = retarget_bone_side(cns.subtarget, side, dupli_only=True)
-
                             if new_subtarget != cns.subtarget:# setting the subtarget can lead to constraints update issues. Only set if necessary
                                 cns.subtarget = new_subtarget
-                    except:
-                        pass
-
-
+                                
+                 
             # replace drivers variables
             for dr in rig.animation_data.drivers:
                 if "_dupli_" in side:
                     if 'pose.bones' in dr.data_path:
                         for var in dr.driver.variables:
                             for tar in var.targets:
-                                if not side[:-2] in tar.data_path:
-                                    #print("Replaced driver var data path", tar.data_path)
+                                if not side[:-2] in tar.data_path:                                   
                                     tar.data_path = tar.data_path.replace(side[-2:], side[:-2] + side[-2:])
-                                    #print("=>", tar.data_path)
                                     
-            """
-            # force drivers to refresh because of bones name change, udpate issues otherwise
-            # switch mode as a hack to force drivers update dependencies
-            bpy.ops.object.mode_set(mode='OBJECT')
-            bpy.ops.object.mode_set(mode='EDIT')
-            new_driver.driver.expression += ' '
-            new_driver.driver.expression = new_driver.driver.expression[:-1]
-            """
-
-            # find added/useless custom shapes and delete them          
-            """
-            used_shapes = [b.custom_shape.name for b in rig_facial.pose.bones if b.custom_shape]
-            for obj in bpy.data.objects:
-                if obj.name.startswith('cs_'):
-                    if not obj.name in cs_objects and not obj.name in used_shapes:
-                        delete_object(obj)
-            """
             bpy.ops.object.mode_set(mode='OBJECT')
             
             rig_facial.matrix_world = rig.matrix_world.copy()
@@ -26762,14 +27369,13 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             # Move all new facial bones near the head
             b1 = get_edit_bone(ard.facial_ref[0] + side[:-2] + ".l")
             
-            if len(b1.keys()) > 0:
+            if len(b1.keys()):
                 if "arp_offset_matrix" in b1.keys():                  
                     head_ref = get_edit_bone("head_ref" + side)
                     b1_local = Matrix(b1["arp_offset_matrix"]) @ b1.matrix
 
                     # store children bones matrix
-                    children_bones = ard.facial_ref + ard.facial_bones
-                    # children_bones.remove(ard.facial_ref[0])
+                    children_bones = ard.facial_ref + ard.facial_bones                  
                     children_mat_dict = {}
                     for child_name in children_bones:
                         sides = []
@@ -26808,30 +27414,10 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                         scale_from_origin(ed_bone=eb, center=head_ref.head, head_coords=bones_coords[eb][0],
                                           tail_coords=bones_coords[eb][1],
                                           factor=(head_ref.tail - head_ref.head).magnitude * 4)
-                    
 
-
-        # Parent lost bones
-        for bn in rig.data.edit_bones:
-
-            if len(bn.keys()) == 0:
-                continue
-
-            if not "arp_parent" in bn.keys():
-                continue
-
-            parent_name = bn["arp_parent"].split(".")[0] + side
-
-            if parent_name.startswith("c_skull") and not skull_bones:
-                parent_name = "head"+side
-
-            parent_bone = get_edit_bone(parent_name)
-
-            if bn.parent == None or parent_name.startswith("c_skull"):# make sure to parent to skull bones
-                if parent_bone:
-                    bn.parent = parent_bone
-
-        # set target constraints with correct side
+        
+        parent_lost_bones()
+    '''
 
     def delete_facial():
         for b in ard.facial_ref + ard.facial_bones + ['c_p_head.x']:
@@ -26855,8 +27441,12 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
         bpy.ops.object.mode_set(mode='OBJECT')
         remove_invalid_drivers()
         bpy.ops.object.mode_set(mode='EDIT')
-
+        
+                
     def set_autolips():
+        if not mouth_enabled:
+            return
+            
         sides = [".l", ".r"]
 
         # set lips corner
@@ -27068,6 +27658,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                 else:
                     clear_auto_lips(b, side[:-2] + _side)
 
+    
     def set_eyebrows_type2():
         print("\nSetting eyebrows type 2...")
 
@@ -27090,7 +27681,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             eyebrow_01_end_name = "eyebrow_01_end" + lat_side
             eyebrow_01_end = get_edit_bone(eyebrow_01_end_name)
             if eyebrow_01_end == None:
-                eyebrow_01_end = bpy.context.active_object.data.edit_bones.new(eyebrow_01_end_name)
+                eyebrow_01_end = create_edit_bone(eyebrow_01_end_name)
                 print("created", eyebrow_01_end_name)
 
             c_eyeb_01_end = get_edit_bone(eyebrows_list[0])
@@ -27288,6 +27879,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                     cns_transf.to_max_z = 0
                 cns_transf.target_space = cns_transf.owner_space = "LOCAL"
 
+    
     def set_eyebrows_type3():
         print("\nSetting eyebrows type 3...")
 
@@ -27379,6 +27971,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                     base_var.targets[0].id = bpy.context.active_object
                     base_var.targets[0].data_path = 'pose.bones["' + c_eyeb_full_name + '"].["wrap"]'
 
+    
     def unset_eyebrows_type3():
         #print("\nUnset eyebrows type 3...")
 
@@ -27388,6 +27981,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
         for lat_side in [head_side + ".l", head_side + ".r"]:
 
             bpy.ops.object.mode_set(mode='EDIT')
+            
             c_eyeb_full_name = 'c_eyebrow_full' + lat_side
 
             # remove c_eyebrow_offset_full
@@ -27410,12 +28004,15 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             c_eyeb_full_pbone = get_pose_bone(c_eyeb_full_name)
 
             # delete wrap property
-            if "wrap" in c_eyeb_full_pbone.keys():
-                del c_eyeb_full_pbone["wrap"]
+            if c_eyeb_full_pbone:
+                if "wrap" in c_eyeb_full_pbone.keys():
+                    del c_eyeb_full_pbone["wrap"]
 
+    
     def unset_eyebrows_type2():
         #print("\nUnset eyebrows type 2...")
         bpy.ops.object.mode_set(mode='EDIT')
+        
         head_side = side[:-2]
 
         for lat_side in [head_side + ".l", head_side + ".r"]:
@@ -27428,6 +28025,8 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             # parent controllers to c_eyebrow_full
             for eyeb_name in eyebrows_list:
                 eyeb = get_edit_bone(eyeb_name)
+                if eyeb == None:
+                    break
                 eyeb.parent = get_edit_bone("c_eyebrow_full" + lat_side)
 
             # remove eyebrow_01_end
@@ -27438,8 +28037,8 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                 print("deleted", eyebrow_01_end_name)
 
             c_eyeb_01_end = get_edit_bone(eyebrows_list[0])
-
-            c_eyeb_01_end.use_deform = True
+            if c_eyeb_01_end:
+                c_eyeb_01_end.use_deform = True
 
             # remove eyebrow_01_end_target
             eyebrow_01_end_target_name = "eyebrow_01_end_target" + head_side + lat_side
@@ -27452,23 +28051,28 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             bpy.ops.object.mode_set(mode='POSE')
 
             def remove_all_cns(pbone):
-                if len(pbone.constraints) > 0:
+                if len(pbone.constraints):
                     for cn in pbone.constraints:
                         # print("removed constraint", pbone.name, cn.name)
                         pbone.constraints.remove(cn)
 
             c_eyeb_01_end_pbone = get_pose_bone(eyebrows_list[0])
-            remove_all_cns(c_eyeb_01_end_pbone)
+            if c_eyeb_01_end_pbone:
+                remove_all_cns(c_eyeb_01_end_pbone)
 
             c_eyeb_01_pbone = get_pose_bone(eyebrows_list[1])
-            remove_all_cns(c_eyeb_01_pbone)
+            if c_eyeb_01_pbone:
+                remove_all_cns(c_eyeb_01_pbone)
 
             c_eyeb_02_pbone = get_pose_bone(eyebrows_list[2])
-            remove_all_cns(c_eyeb_02_pbone)
+            if c_eyeb_02_pbone:
+                remove_all_cns(c_eyeb_02_pbone)
 
             c_eyeb_03_pbone = get_pose_bone(eyebrows_list[3])
-            remove_all_cns(c_eyeb_03_pbone)
+            if c_eyeb_03_pbone:
+                remove_all_cns(c_eyeb_03_pbone)
 
+    
     def set_lips_offset():
         if lips_offset:
             print("\nSetting lips offset controller...")
@@ -27639,7 +28243,10 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
 
             for lip in upper_lips:
                 lip_bone = get_edit_bone(lip)
-
+                
+                if lip_bone == None:
+                    continue
+                    
                 if skull_bones:
                     lip_bone.parent = c_skull_01
                 else:
@@ -27665,18 +28272,21 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
                          "c_lips_bot_01_offset" + head_side + ".r"]
             jawbone = get_edit_bone("jawbone" + side)
 
-            for lip in down_lips:
+            for lip in down_lips:            
                 lip_bone = get_edit_bone(lip)
+                if lip_bone == None:
+                    continue
                 lip_bone.parent = jawbone
 
             # parent jaw_ret_bone to c_skull_01
             jaw_ret_name = "jaw_ret_bone" + side
             jaw_ret = get_edit_bone(jaw_ret_name)
 
-            if skull_bones:
-                jaw_ret.parent = c_skull_01
-            else:
-                jaw_ret.parent = head_def
+            if jaw_ret:
+                if skull_bones:            
+                    jaw_ret.parent = c_skull_01
+                else:
+                    jaw_ret.parent = head_def
 
             ## Set constraints
             bpy.ops.object.mode_set(mode='POSE')
@@ -27684,14 +28294,16 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
             # set the jaw_ret_bone constraint
             # set the original Copy Transforms constraint to 0.5
             jaw_ret_pbone = get_pose_bone(jaw_ret_name)
-            jaw_ret_pbone.constraints[0].influence = 0.5
+            if jaw_ret_pbone:
+                jaw_ret_pbone.constraints[0].influence = 0.5
 
-            # remove the new Copy Rot constraint to jaw_base.x
-            cns_rot = jaw_ret_pbone.constraints.get("Copy Rotation")
-            if cns_rot:
-                jaw_ret_pbone.constraints.remove(cns_rot)
-                print("deleted constraint", jaw_ret_pbone.name, "Copy Rotation")
+                # remove the new Copy Rot constraint to jaw_base.x
+                cns_rot = jaw_ret_pbone.constraints.get("Copy Rotation")
+                if cns_rot:
+                    jaw_ret_pbone.constraints.remove(cns_rot)
+                    print("deleted constraint", jaw_ret_pbone.name, "Copy Rotation")
 
+    
     def set_lips_corner_offset():
         if lips_corner_offset:
             print("\nSetting lips corner offset...")
@@ -27892,6 +28504,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
 
             bpy.ops.object.mode_set(mode='POSE')
 
+    
     def set_lips_masters():
         master_top_name = "lips_top_master_ref" + side
         master_bot_name = "lips_bot_master_ref" + side
@@ -28012,6 +28625,7 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
 
             print("  lips master unset.")
 
+    
     def set_skull_bones():
         # Set skull bones
         if skull_bones:
@@ -28023,15 +28637,17 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
 
                 # add skull bone
                 if skull_ebone == None:
-                    skull_ebone = rig.data.edit_bones.new(skull_name)
+                    skull_ebone = create_edit_bone(skull_name)
                     # transforms
                     copy_bone_transforms(head_ref, skull_ebone)
                     # layer
                     set_bone_layer(skull_ebone, 1)
                     # parent
                     skull_ebone.parent = head
+                    
 
             bpy.ops.object.mode_set(mode='POSE')
+            
 
             for skull_name in ard.skulls:
                 skull_name_def = skull_name[:-2] + side
@@ -28069,17 +28685,34 @@ def set_facial(enable=True, auto_lips=True, auto_lips_visual=False, lips_offset=
 
     # Set facial
     if enable:
-        create_facial()
+        #create_facial()
+        set_facial_sublimb(module_name='rig_mouth', active=mouth_enabled, bones_list=ard.mouth_bones+ard.mouth_ref, matrix_ref_bone=ard.facial_ref_dict['jaw']) 
         set_autolips()
+        set_facial_sublimb(module_name='rig_teeth', active=teeth_enabled and mouth_enabled, bones_list=ard.teeth_bones+ard.teeth_ref, matrix_ref_bone=ard.teeth_bones[0])
+        set_facial_sublimb(module_name='rig_tongue', active=tongue_enabled and mouth_enabled, bones_list=ard.tongue_bones+ard.tongue_ref, matrix_ref_bone=ard.tongue_bones[0])
+        set_facial_sublimb(module_name='rig_chins', active=chins_enabled, bones_list=ard.chin_bones+ard.chin_ref, matrix_ref_bone=ard.chin_bones[0])        
+        set_facial_sublimb(module_name='rig_noses', active=noses_enabled, bones_list=ard.nose_bones+ard.nose_ref, matrix_ref_bone=ard.nose_bones[0])
+        set_facial_sublimb(module_name='rig_eye_l', active=eye_l_enabled, bones_list=ard.eye_bones_left, matrix_ref_bone=ard.eye_bones_left[0])
+        set_facial_sublimb(module_name='rig_eye_r', active=eye_r_enabled, bones_list=ard.eye_bones_right, matrix_ref_bone=ard.eye_bones_right[0])
+        if eye_l_enabled == False and eye_r_enabled == False:
+            delete_eye_target_mid(side)
+        set_facial_sublimb(module_name='rig_eyebrow_l', active=eyebrow_l_enabled, bones_list=ard.eyebrow_bones_left, matrix_ref_bone=ard.eyebrow_bones_left[0])
+        set_facial_sublimb(module_name='rig_eyebrow_r', active=eyebrow_r_enabled, bones_list=ard.eyebrow_bones_right, matrix_ref_bone=ard.eyebrow_bones_right[0])
+        set_facial_sublimb(module_name='rig_cheeks', active=cheeks_enabled, bones_list=ard.cheek_bones+ard.cheek_ref, matrix_ref_bone=ard.cheek_bones[0])
+        
+        ### experimental
+        set_lips_offset()
+        set_lips_corner_offset()
+        set_lips_masters()        
+        
         unset_eyebrows_type2()
         unset_eyebrows_type3()
         if eyebrows_type == 'type_2':
             set_eyebrows_type2()
         elif eyebrows_type == 'type_3':
             set_eyebrows_type3()
-        set_lips_offset()
-        set_lips_corner_offset()
-        set_lips_masters()
+        ###
+        
     else:
         delete_facial()
 
@@ -28774,6 +29407,7 @@ class ARP_PT_misc(Panel, ArpRigPanel):
                     return
         
         layout.operator("arp.update_armature", text="Update Armature")
+        layout.operator("arp.check_for_update", text="Check for Updates")                                                                 
         layout.operator("arp.clean_scene", text="Clean Scene")
         layout.operator("arp.set_character_name", text="Set Character Name")
 
@@ -28882,8 +29516,9 @@ classes = (
     ARP_OT_set_character_name, ARP_OT_show_retro_options, ARP_OT_align_wings, ARP_OT_add_muscles, ARP_OT_remove_muscles,
     ARP_OT_add_corrective_bone, ARP_OT_add_corrective_driver, ARP_OT_cancel_corrective_driver, ARP_OT_lines_fx,
     ARP_OT_smart_pick_object, ARP_OT_set_eyelids_borders, ARP_OT_mirror_shape_keys,
-    ARP_OT_bind_VHDS,
-    ARP_PT_auto_rig_pro_panel, ARP_PT_binding_settings, ARP_PT_binding_specials, ARP_PT_binding_bind, ARP_PT_binding_shapekeys, ARP_PT_misc, ARP_PT_misc_picker, ARP_PT_misc_color)
+    ARP_OT_bind_VHDS, ARP_OT_check_for_update,
+    ARP_PT_auto_rig_pro_panel, ARP_PT_binding_settings, ARP_PT_binding_specials, ARP_PT_binding_bind, ARP_PT_binding_shapekeys, ARP_PT_misc, ARP_PT_misc_picker, ARP_PT_misc_color
+    )
 
 def update_arp_tab():
     interface_classes = (ARP_PT_auto_rig_pro_panel, ARP_PT_binding_settings, ARP_PT_binding_specials, ARP_PT_binding_bind, ARP_PT_binding_shapekeys, ARP_PT_misc, ARP_PT_misc_picker, ARP_PT_misc_color)
@@ -28956,6 +29591,14 @@ def register():
                                                                       'Phalanges rotations are not driven by the scale of the first one')),
                                                               name="Fingers Rotation",
                                                               description="Automatic rotation of the fingers phalanges based on the scale of the first phalange")
+    bpy.types.Object.rig_fingers_rot_thumb = EnumProperty(items=(('scale_2_phalanges', 'Rot from Scale: 2',
+                                                                      'The mid and tip phalanges rotation are driven by the scale of the first one'),
+                                                                     ('scale_3_phalanges', 'Rot from Scale: 3',
+                                                                      'All phalanges rotation are driven by the scale of the first one'),
+                                                                     ('no_scale', 'Disabled',
+                                                                      'Phalanges rotations are not driven by the scale of the first one')),
+                                                              name="Fingers Rotation",
+                                                              description="Automatic rotation of the thumb phalanges based on the scale of the first phalange")
     bpy.types.Object.arp_secondary_type = EnumProperty(items=(('ADDITIVE', 'Additive (Exportable)',
                                                                          'Additive mode for the secondary deformations used to curve the arms and legs.\nExportable to FBX'),
                                                                         ('TWIST_BASED', 'Twist (Exportable, best)',
@@ -29053,6 +29696,7 @@ def unregister():
 
     del bpy.types.Object.arp_rig_type
     del bpy.types.Object.rig_fingers_rot
+    del bpy.types.Object.rig_fingers_rot_thumb
     del bpy.types.Object.arp_secondary_type
     del bpy.types.Object.arp_fingers_shape_style
     del bpy.types.Scene.arp_init_scale

@@ -308,9 +308,132 @@ class ARP_OT_redefine_rest_pose(Operator):
         return {'FINISHED'}
 
 
-class ARP_OT_auto_scale(Operator):
+def show_action_row(_col, _act_name):
+        row2 = _col.row(align=True)
+        row2.label(text=_act_name)
+        icon_name = 'CHECKBOX_DEHLT'#'CHECKBOX_HLT'
+        act = bpy.data.actions.get(_act_name)
+        if len(act.keys()):
+            if "arp_remap" in act.keys():
+                if act["arp_remap"] == True:
+                    icon_name = 'CHECKBOX_HLT'
+        op1 = row2.operator('arp.toggle_action_remap', text='', icon=icon_name)
+        op1.action_name = _act_name
+        op = row2.operator('arp.delete_action', text='', icon = 'X')
+        op.action_name = _act_name
 
-    #tooltip
+        
+class ARP_OT_toggle_action_remap(Operator):
+    """Enable or disable this action from export"""
+
+    bl_idname = "arp.toggle_action_remap"
+    bl_label = "toggle_action_remap"
+    bl_options = {'UNDO'}
+
+    action_name : StringProperty(default="")
+
+    def execute(self, context):
+        use_global_undo = context.preferences.edit.use_global_undo
+        context.preferences.edit.use_global_undo = False
+
+        try:
+            if self.action_name != "":
+                act = bpy.data.actions.get(self.action_name)
+                if act:
+                    found_prop = False
+                    if len(act.keys()):
+                        if "arp_remap" in act.keys():
+                            act["arp_remap"] = not act["arp_remap"]                           
+                            found_prop = True
+                    if not found_prop:
+                        act["arp_remap"] = True
+
+        finally:
+            context.preferences.edit.use_global_undo = use_global_undo
+
+        return {'FINISHED'}  
+
+
+class ARP_OT_enable_all_actions(Operator):
+    """Enable all actions for retargetting"""
+    
+    bl_idname = "arp.remap_enable_all_actions"
+    bl_label = ""
+    
+    def execute(self, context):
+        
+        for act in bpy.data.actions:
+            act['arp_remap'] = True
+      
+        return {'FINISHED'}
+        
+    
+class ARP_OT_disable_all_actions(Operator):
+    """Disable all actions for retargetting"""
+    
+    bl_idname = "arp.remap_disable_all_actions"
+    bl_label = ""
+   
+    def execute(self, context):
+        
+        for act in bpy.data.actions:
+            act['arp_remap'] = False
+      
+        return {'FINISHED'}
+        
+
+class ARP_OT_batch_retarget(Operator):
+    """Select multiple source animations for retargetting"""
+
+    bl_idname = "arp.batch_retarget"
+    bl_label = ""
+    bl_options = {'UNDO'}
+    
+    actions_list = []
+    
+    def draw(self, context):
+        layout = self.layout
+        scn = context.scene
+        
+        layout.prop(scn, 'batch_retarget', text='Enable Multiple Animations Retargetting')        
+        
+        row = layout.row(align=True)
+        row.enabled = scn.batch_retarget
+        row.operator('arp.remap_enable_all_actions', text='Enable All')
+        row.operator('arp.remap_disable_all_actions', text='Disable All')
+        
+        for actname in self.actions_list:
+            #act = bpy.data.actions.g
+            #if not check_id_root(bpy.):
+            #    continue
+            
+            col = layout.column(align=True)
+            col.enabled = scn.batch_retarget            
+            show_action_row(col, actname)          
+      
+        layout.separator()
+            
+
+    def invoke(self, context, event):  
+        if len(bpy.data.actions) == 0:
+            self.report({'ERROR'}, 'No actions found')
+            return {'FINISHED'}            
+      
+        self.actions_list = []
+        
+        for act in bpy.data.actions:
+            if not act.name in self.actions_list:
+                self.actions_list.append(act.name)
+                
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self, width=450)
+        
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+
+class ARP_OT_auto_scale(Operator):
     """Automatic scale of the source armature to fit the target armature height\nMay not work if the rest position is incorrect, the height is calculated on this basis. Scale manually otherwise."""
 
     bl_idname = "arp.auto_scale"
@@ -659,19 +782,26 @@ def check_retargetting_inputs(self):
         self.report({'ERROR'}, 'The source armature has no animation')
         return {'FINISHED'}
 
-    self.frame_start, self.frame_end = self.source_rig.animation_data.action.frame_range
+    self.frame_start, self.frame_end = int(self.source_rig.animation_data.action.frame_range[0]), int(self.source_rig.animation_data.action.frame_range[1])
 
-    #check if a Root bone has been assigned    
+    # check if a Root bone has been assigned    
     if self.unbind == False:
         found_root = False
-        for bone in context.scene.bones_map:
-            if bone.set_as_root:
+        for item in context.scene.bones_map:
+            if item.set_as_root:
                 found_root = True
 
-        if not found_root:
+                if item.name == '':
+                    log_error_state()
+                    self.report({'ERROR'}, 'The root bone has no target')
+                    return {'FINISHED'}
+                
+        if not found_root:   
             log_error_state()
             self.report({'ERROR'}, 'The root bone must be marked first: "Set as Root"')
             return {'FINISHED'}
+            
+        
     
     # check for invalid arp bones
     target_armature = get_object(context.scene.target_rig).data
@@ -702,13 +832,10 @@ def check_retargetting_inputs(self):
             bone.name = ''
             duplis_found = True
             
-    # VSE We don't need the whole invoke call to be interupted by an essentially one time warning
-    #if duplis_found:
-    #    log_error_state()
-    #    self.report({'ERROR'}, 'Some target bones were assigned multiple times, duplicates were cleared automatically')
-    #    return {'FINISHED'}
-
-                    
+    if duplis_found:       
+        print('Some target bones were assigned multiple times, duplicates were cleared automatically')
+        
+        
 def check_armature_init_transforms(self):
     if self.target_rig == None or self.source_rig == None:
         return
@@ -832,7 +959,7 @@ class ARP_OT_bind_only(Operator):
     target_rig_is_frozen = True
     freeze_source: EnumProperty(items=(('YES', 'Yes, Please!', ''), ('NO', "No, Maybe Later", '')), default='NO', name='Freeze Source Armature')
     freeze_target: EnumProperty(items=(('YES', 'Yes, Please!', ''), ('NO', "No, Maybe Later", '')), default='NO', name='Freeze Target Armature')
-    show_freeze_warn: BoolProperty(default=True)
+    show_freeze_warn: BoolProperty(default=True)    
     
     invalid_arp_bones = None
     bind_only = True
@@ -855,7 +982,7 @@ class ARP_OT_bind_only(Operator):
             layout.label(text='in the list are not controller (no "c_" prefix").')
             layout.label(text='Retargetting to non-controller bones can potentially break the rig. Continue?')
 
-        layout.separator()        
+        layout.separator()             
 
 
     def invoke(self, context, event):
@@ -940,6 +1067,7 @@ class ARP_OT_retarget(Operator):
     freeze_source: EnumProperty(items=(('YES', 'Yes, Please!', ''), ('NO', "No, Maybe Later", '')), default='NO', name='Freeze Source Armature')
     freeze_target: EnumProperty(items=(('YES', 'Yes, Please!', ''), ('NO', "No, Maybe Later", '')), default='NO', name='Freeze Target Armature')
     show_freeze_warn: BoolProperty(default=True)
+    fake_user_action: BoolProperty(default=False, description='Enable "Fake User" for the remapped action, so that it is not deleted later if not used.\nAutomatically enabled when retargetting multiple animations', name='Fake User')
     
     source_origin_not_normalized = False
     force_source_freeze : EnumProperty(items=(('YES', 'Yes, Please!', ''), ('NO', "No, Maybe Later", '')), default='NO', description="Freeze the source armature", name="Freeze Source Armature")
@@ -960,9 +1088,10 @@ class ARP_OT_retarget(Operator):
         layout = self.layout
         draw_menu_freeze(self, layout)
         
-        row = layout.column().row(align=True)
-        row.prop(self, 'frame_start')
-        row.prop(self, 'frame_end')
+        if not context.scene.batch_retarget:
+            row = layout.column().row(align=True)
+            row.prop(self, 'frame_start')
+            row.prop(self, 'frame_end')
         
         layout.use_property_split = True
         layout.separator()
@@ -976,9 +1105,12 @@ class ARP_OT_retarget(Operator):
             layout.label(text='The target armature is an Auto-Rig Pro armature, while some bones')
             layout.label(text='in the list are not controller (no "c_" prefix").')
             layout.label(text='Retargetting to non-controller bones can potentially break the rig. Continue?')
-
+            
         layout.separator()
         
+        if not context.scene.batch_retarget:
+            layout.prop(self, 'fake_user_action') #icon='FAKE_USER_ON', text='')
+            layout.separator()
 
     def invoke(self, context, event):
         scn = context.scene
@@ -988,6 +1120,18 @@ class ARP_OT_retarget(Operator):
         self.force_source_freeze = 'YES'
         check_retargetting_inputs(self)
         check_armature_init_transforms(self)
+        
+        if scn.batch_retarget:
+            found_at_least_one = False
+            for act in bpy.data.actions:
+                if 'arp_remap' in act.keys():
+                    if act['arp_remap'] == True:
+                        found_at_least_one = True
+                        break
+                        
+            if found_at_least_one == False:
+                self.report({'ERROR'}, 'No actions to bake, check Multiple Source Anim...')
+                return {'FINISHED'}
         
         if self.safety_check_error:
             return {'FINISHED'}
@@ -1014,7 +1158,8 @@ class ARP_OT_retarget(Operator):
             # save to object mode
             bpy.ops.object.mode_set(mode='OBJECT')
 
-            # execute            
+            # execute     
+          
             if (not self.source_rig_is_frozen and self.freeze_source == 'YES') or self.force_source_freeze == 'YES':
                 _freeze_armature("source")
             if (not self.target_rig_is_frozen and self.freeze_target == 'YES'):
@@ -1768,7 +1913,7 @@ def _apply_offset(value, post_baking=False, set_selection=True):
             if target_pb:
                 remap_name = ''
                 for cns in target_pb.constraints:
-                    if cns.name.endswith('_loc_REMAP'):
+                    if cns.name.endswith('_loc_REMAP') or cns.name.endswith(' LocationREMAP'):
                         remap_name = cns.subtarget                    
                     
                 bone_remap = source_rig.pose.bones.get(remap_name)
@@ -2527,9 +2672,8 @@ def _retarget(self):
 
     preserve = False
     if 'remap_redefine_preserve' in source_rig.keys() and 'rest_transf_offset' in scn.keys():
-        preserve = source_rig['remap_redefine_preserve']
+        preserve = source_rig['remap_redefine_preserve']    
     
-    frame_range = [self.frame_start, self.frame_end]
 
     # make sure the target armature is visible
     armature_hidden = is_object_hidden(target_rig)
@@ -2595,6 +2739,9 @@ def _retarget(self):
 
     if is_already_bound == False and self.unbind == False:
         print("  Binding...")
+        
+        # save the bound state in a property
+        target_rig["arp_retarget_bound"] = True
 
         bpy.ops.object.mode_set(mode='POSE')
 
@@ -2730,6 +2877,7 @@ def _retarget(self):
         bone_names = [b.name for b in source_rig.data.edit_bones]
         for bname in bone_names:
             eb = get_edit_bone(bname)
+            #print("create remaptweak bone", eb.name+tweak_suffix)
             tweak_b = create_edit_bone(eb.name+tweak_suffix)
             copy_bone_transforms(eb, tweak_b)            
             set_bone_layer(tweak_b, 25)
@@ -2880,9 +3028,7 @@ def _retarget(self):
                     cns.subtarget = source_bone_name
                     cns.name += 'REMAP'
 
-                    bpy.ops.object.mode_set(mode='EDIT')             
-                    
-                      
+                    bpy.ops.object.mode_set(mode='EDIT')
                 
                 # optional: ik bones
                 if bone_item.ik:
@@ -2942,14 +3088,14 @@ def _retarget(self):
                     eb_source_bone = get_edit_bone(source_bone_name)
                     
                     if bone_item.ik_pole != "":
-                        bone_parent_1 = eb_source_bone.parent
+                        bone_parent_1 = eb_source_bone.parent if bone_item.ik_2 == '' else get_edit_bone(bone_item.ik_2)
 
                         # check for missing bones
                         if bone_parent_1 == None:
                             print("Can't setup IK, incorrect bones hierarchy")
                             continue# the IK hierarchy is incorrect, the target IK bone has no parent, skip it
 
-                        bone_parent_2 = bone_parent_1.parent
+                        bone_parent_2 = bone_parent_1.parent if bone_item.ik_1 == '' else get_edit_bone(bone_item.ik_1)
 
                         if bone_parent_2 == None:
                             print("Can't setup IK, incorrect bones hierarchy")
@@ -2963,70 +3109,116 @@ def _retarget(self):
                         track_bone = create_edit_bone(track_bone_name)
                         set_bone_layer(track_bone, 24)
                         
-                        # Check for ik chains straight alignment
-                        if bone_parent_1.y_axis.angle(bone_parent_2.y_axis) == 0.0:
-                            print("  Warning: Straight IK chain (" + bone_item.name + "), adding offset...")
-                            # find foot direction if any
-                            bone_vec = None
-                            for ed_bone in source_rig.data.edit_bones:
-                                if 'foot' in ed_bone.name.lower():
-                                    print("    found a foot bone as reference for offset")
-                                    bone_vec = ed_bone.tail - ed_bone.head
-                                    break
-                                    
-                            # else, get the current bone vector... not the good way to find the elbow direction :-(
-                            if bone_vec == None:
-                                bone_vec = eb_source_bone.tail - eb_source_bone.head
-
-                            if 'hand' in bone_item.name.lower():
-                                bone_vec *= -1
                         
-                            #offset the middle position
-                            x_axis1, x_axis2 = bone_parent_1.x_axis.copy(), bone_parent_2.x_axis.copy()# make sure to preserve roll, may get corrupted
-                            bone_parent_1.head += bone_vec/5
-                            bone_parent_2.tail += bone_vec/5
-                            align_bone_x_axis(bone_parent_1, x_axis1)
-                            align_bone_x_axis(bone_parent_2, x_axis2)
+                        # Check for ik chains straight alignment
+                        # No ideal way to correct a straight chain, since the direction is unknown
+                        # give it a try though :)
+                        method = 2
+                        if method == 1:
+                            # bone axis vector evaluation, may be incorrect
+                            if bone_parent_1.y_axis.angle(bone_parent_2.y_axis) == 0.0:
+                                print("  Warning: Straight IK chain (" + bone_item.name + "), adding offset...")
+                                # find foot direction if any
+                                bone_vec = None
+                                for ed_bone in source_rig.data.edit_bones:
+                                    if 'foot' in ed_bone.name.lower():
+                                        print("    found a foot bone as reference for offset")
+                                        bone_vec = ed_bone.tail - ed_bone.head
+                                        break
+                                        
+                                # else, get the current bone vector... not the good way to find the elbow direction :-(
+                                if bone_vec == None:
+                                    bone_vec = eb_source_bone.tail - eb_source_bone.head
+
+                                if 'hand' in bone_item.name.lower():
+                                    bone_vec *= -1
                             
+                                #offset the middle position
+                                x_axis1, x_axis2 = bone_parent_1.x_axis.copy(), bone_parent_2.x_axis.copy()# make sure to preserve roll, may get corrupted
+                                bone_parent_1.head += bone_vec/5
+                                bone_parent_2.tail += bone_vec/5
+                                align_bone_x_axis(bone_parent_1, x_axis1)
+                                align_bone_x_axis(bone_parent_2, x_axis2)
+                        
+                        
+                        elif method == 2:
+                            print("  Warning: Straight IK chain (" + bone_item.name + "), adding offset...")
+                            # actual bone position evaluation
+                            vec1 = (bone_parent_2.head - bone_parent_1.head)
+                            vec2 = (bone_parent_1.head - eb_source_bone.head)
+                            angle = degrees(vec1.angle(vec2))
+                            
+                            # first try on Y
+                            vec = source_rig.matrix_world.inverted() @ Vector((0.0, 0.01, 0.0))
+                            # or get the foot axis if any
+                            if 'foot' in eb_source_bone.name:
+                                vec = (eb_source_bone.y_axis)/10
+                            
+                            t = 0
+                            while angle < 0.1 and t < 2000:    
+                                t += 1
+                                # then try on X
+                                if t > 500:
+                                    vec = Vector((0.01, 0.0, 0.0))
+                                # then Z
+                                elif t > 1000:
+                                    vec = Vector((0.0, 0.0, 0.1))
+                                    
+                                bone_parent_1.head += vec
+                                vec1 = (bone_parent_2.head - bone_parent_1.head)
+                                vec2 = (bone_parent_1.head - eb_source_bone.head)
+                                angle = degrees(vec1.angle(vec2))
+                                
+                            if t >= 2000:
+                                print("Failed to correct IK chain angle!")
                         
                         # track_bone coords
-                        track_bone.head = (eb_source_bone.head + bone_parent_2.head) * 0.5
+                        #   mid point evaluation, not best
+                        #track_bone.head = (eb_source_bone.head + bone_parent_2.head) * 0.5
+                        #   direct line projection evaluation, best                        
+                        track_bone.head = project_point_onto_line(bone_parent_2.head, eb_source_bone.head, bone_parent_1.head)
                         track_bone.tail = bone_parent_1.head.copy()
-
+                        
+                        d1 = (track_bone.tail - bone_parent_2.head).magnitude
+                        
+                        d_tot = (eb_source_bone.head - bone_parent_2.head).magnitude
                         ik_chains[source_bone_name] = [bone_parent_1_name, bone_parent_2_name, bone_item.ik_pole]
-
+                        
                         # Fk pole
                         fk_pole_name = bone_item.name+"_FK_POLE_REMAP"
                         fk_pole = context.object.data.edit_bones.new(fk_pole_name)
-                        set_bone_layer(fk_pole, 24)                     
-                        fk_pole.head = track_bone.tail + (track_bone.tail-track_bone.head).normalized() * ((bone_parent_1.tail-bone_parent_1.head).magnitude + (bone_parent_2.tail-bone_parent_2.head).magnitude)
+                        set_bone_layer(fk_pole, 24) 
+                        
+                        fk_pole.head = track_bone.tail + (track_bone.tail-track_bone.head).normalized() * ((bone_parent_1.tail-bone_parent_1.head).magnitude + (bone_parent_2.tail-bone_parent_2.head).magnitude)                      
                         fk_pole.tail = fk_pole.head + (track_bone.tail - track_bone.head)*2
                         
-                        if bone_item.ik_auto_pole:
+                        if bone_item.ik_auto_pole == 'RELATIVE_TARGET':
                             # auto pole, just parent the FK pole to the foot/hand...
                             fk_pole.parent = get_edit_bone(source_bone_name)
-                        else:
-                            # otherwise parent to the track bone to calculate the IK orientation
+                        elif bone_item.ik_auto_pole == 'ABSOLUTE':
+                            # otherwise parent to the track bone to evaluate the true IK pole vector
                             fk_pole.parent = track_bone
+                        elif bone_item.ik_auto_pole == 'RELATIVE_CHAIN':
+                            fk_pole.parent = bone_parent_2
                         
                         
                         # Add constraints
                         bpy.ops.object.mode_set(mode='POSE')
                         
                         p_track_bone = get_pose_bone(track_bone_name)
-
+                        #print('track_bone_name', track_bone_name)
                         cns = p_track_bone.constraints.new('COPY_LOCATION')
                         cns.target = context.active_object
                         cns.subtarget = bone_parent_2_name
                         cns.name += 'REMAP'
-
+                        
                         cns = p_track_bone.constraints.new('COPY_LOCATION')
                         cns.target = context.active_object
                         cns.subtarget = source_bone_name
                         #cns.head_tail = 1.0
-                        cns.influence = 0.5
+                        cns.influence = d1/d_tot#0.5
                         cns.name += 'REMAP'
-
+                        
                         cns = p_track_bone.constraints.new('TRACK_TO')
                         cns.target = context.active_object
                         cns.subtarget = bone_parent_1_name
@@ -3034,7 +3226,7 @@ def _retarget(self):
                         cns.name += 'REMAP'
                         cns.track_axis = "TRACK_Y"
                         cns.up_axis = "UP_Z"
-                    
+                        
                 bpy.ops.object.mode_set(mode='EDIT')    
                 
         
@@ -3064,6 +3256,7 @@ def _retarget(self):
                     if ik_pbone:
                         if "ik_fk_switch" in ik_pbone.keys():
                             ik_pbone["ik_fk_switch"] = 1.0
+                            
                             
         bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -3104,11 +3297,11 @@ def _retarget(self):
 
 
         for bone_item in scn.bones_map:
-            if bone_item.name != "" and bone_item.name != "None" and context.object.pose.bones.get(bone_item.name):
-                #select it for baking
-                pose_bone = context.object.pose.bones[bone_item.name]
-                context.object.data.bones.active = pose_bone.bone
-
+            if bone_item.name != "" and bone_item.name != "None" and context.active_object.pose.bones.get(bone_item.name):
+                
+                pose_bone = context.active_object.pose.bones[bone_item.name]              
+                context.active_object.data.bones.active = pose_bone.bone
+                
                 # Add constraints
                 # main rotation
                 cns = pose_bone.constraints.new('COPY_ROTATION')
@@ -3162,10 +3355,7 @@ def _retarget(self):
                         if "pole_parent" in pole.keys():
                             pole['pole_parent'] = 0
 
-        bpy.ops.object.mode_set(mode='OBJECT')       
-        #print(br)
-        # save the bound state in a property
-        target_rig["arp_retarget_bound"] = True
+        bpy.ops.object.mode_set(mode='OBJECT')
         
         # Apply saved Interactive Tweaks (bind mode)       
         print("  Apply interactive tweaks (bind mode)...")
@@ -3188,43 +3378,86 @@ def _retarget(self):
             self.report({'INFO'}, "Already bound")
 
     if self.bind_only == False:
-        print("\n  Baking final [" + str(frame_range[0]) + "-" + str(frame_range[1]) + "]")
         
-        # bake anim
-        bake_anim(frame_start=frame_range[0], frame_end=frame_range[1], only_selected=True, bake_bones=True, bake_object=False, interpolation_type=self.interpolation_type, handle_type=self.handle_type)
+        # select baked bones
+        for bone_item in scn.bones_map:
+            if bone_item.name != "" and bone_item.name != "None" and context.active_object.pose.bones.get(bone_item.name):                
+                pose_bone = context.active_object.pose.bones[bone_item.name]
+                context.active_object.data.bones.active = pose_bone.bone
+                
+                if bone_item.ik_pole != '' and bone_item.ik:
+                    pose_bone = context.active_object.pose.bones[bone_item.ik_pole]
+                    context.active_object.data.bones.active = pose_bone.bone
+                
+                
+        actions_to_bake = [source_rig.animation_data.action.name]
         
-        # Change action name
-        target_rig.animation_data.action.name = source_rig.animation_data.action.name + '_remap'
+        if scn.batch_retarget:
+            for act in bpy.data.actions:
+                if 'arp_remap' in act.keys():
+                    if act['arp_remap'] == True:
+                        if not act.name in actions_to_bake:
+                            actions_to_bake.append(act.name)
+                            
+        frame_range = [self.frame_start, self.frame_end]
+              
+        for act_name in actions_to_bake:
+            # set source action
+            source_rig.animation_data.action = bpy.data.actions.get(act_name)
+            
+            print("\n  Baking action:", act_name, " [" + str(frame_range[0]) + "-" + str(frame_range[1]) + "]")
+            
+            frstart = frame_range[0]
+            frend = frame_range[1]
+            
+            if scn.batch_retarget:
+                frstart = source_rig.animation_data.action.frame_range[0]
+                frend = source_rig.animation_data.action.frame_range[1]
+                
+            # bake anim
+            bake_anim(frame_start=frstart, frame_end=frend, only_selected=True, bake_bones=True, bake_object=False, interpolation_type=self.interpolation_type, handle_type=self.handle_type)
+            
+            # Change action name
+            target_rig.animation_data.action.name = source_rig.animation_data.action.name + '_remap'
+            print('    '+target_rig.animation_data.action.name)
+            
+            # set fake user
+            if self.fake_user_action or scn.batch_retarget:
+                target_rig.animation_data.action.use_fake_user = True
 
-        # Apply saved Interactive Tweaks:        
-        print("  Apply interactive tweaks...")
-        current_map_idx = scn.bones_map_index
-        for idx in range(0, len(scn.bones_map)):
-            scn.bones_map_index = idx
-            bone_item = scn.bones_map[idx]
+            # Apply saved Interactive Tweaks:        
+            print("  Apply interactive tweaks...")
+            current_map_idx = scn.bones_map_index
+            for idx in range(0, len(scn.bones_map)):
+                scn.bones_map_index = idx
+                bone_item = scn.bones_map[idx]
+                
+                # rot add
+                if bone_item.rot_add != Vector((0.0, 0.0, 0.0)):
+                    _apply_offset("rot_add", post_baking=True)
+                
+                # loc add
+                if bone_item.loc_add != Vector((0.0, 0.0, 0.0)):
+                    _apply_offset("loc_add", post_baking=True)
+                
+                # loc mult
+                if bone_item.loc_mult != 1.0:
+                    _apply_offset("loc_mult", post_baking=True)
             
-            # rot add
-            if bone_item.rot_add != Vector((0.0, 0.0, 0.0)):
-                _apply_offset("rot_add", post_baking=True)
+            # restore bones list index
+            scn.bones_map_index = current_map_idx
             
-            # loc add
-            if bone_item.loc_add != Vector((0.0, 0.0, 0.0)):
-                _apply_offset("loc_add", post_baking=True)
-            
-            # loc mult
-            if bone_item.loc_mult != 1.0:
-                _apply_offset("loc_mult", post_baking=True)
+        # restore source action
+        source_rig.animation_data.action = bpy.data.actions.get(actions_to_bake[0])
         
-        # restore bones list index
-        scn.bones_map_index = current_map_idx
-
+        
     # is it already bound?
     is_already_bound = False
-    if len(target_rig.keys()) > 0:
+    if len(target_rig.keys()):
         if "arp_retarget_bound" in target_rig.keys():
             if target_rig["arp_retarget_bound"] == True:
                 is_already_bound = True
-
+    
     if is_already_bound:
         if (self.bind_only and self.unbind) or (self.bind_only == False):
             print("  Unbinding...")
@@ -3302,7 +3535,7 @@ def _retarget(self):
                         continue
                     #check angle at each frames
                     #scn.frame_current = keyframe.co[0]
-                    scn.frame_set(cframe)
+                    scn.frame_set(int(cframe))
 
                     for key, value in ik_chains.items():
                         bone1 = get_object(scn.source_rig).pose.bones[value[0]]
@@ -3394,10 +3627,18 @@ class BoneRemapSettings(PropertyGroup):
     offset_rot_y : FloatProperty(name = "Offset Y Rotation", default = 0.0, description = 'Offset Y rotation value')
     offset_rot_z : FloatProperty(name = "Offset Z Rotation", default = 0.0, description = 'Offset Z rotation value')
 
-    ik : BoolProperty(name="IK", default = False, description="Use IK remapping, similar to world space location (useful for accurate feet tracking)")
+    ik : BoolProperty(name="IK", default=False, description="Use IK remapping, similar to world space location (useful for accurate feet tracking)")
     ik_pole : StringProperty(default="", description="IK pole bone (optional)")
-    ik_auto_pole : BoolProperty(name="Auto Pole", default = False, description = "The pole bone will inherit the target bone transforms, instead of trying to match the IK chain orientation.\nUseful for legs, knees poles.")
+    #ik_auto_pole : BoolProperty(name="Auto Pole (Target)", default=False, description="The pole bone will inherit the target bone transforms, instead of trying to match the IK chain orientation.\nUseful to avoid IK flips")
+    #ik_auto_pole_chain : BoolProperty(name="Auto Pole (Chain)", default=False, description="The pole bone will inherit the IK bones chain transforms, instead of trying to match the IK chain orientation.\nUseful to avoid IK flips")
+    ik_auto_pole: EnumProperty(items=(
+        ('ABSOLUTE', 'Absolute', 'Evaluate the real IK pole position based on the chain true pole vector\nMay cause IK flip when the IK chain is straight'), 
+        ('RELATIVE_TARGET', 'Relative: Target', 'Evaluate the IK pole position as a child of the target bone'),
+        ('RELATIVE_CHAIN', 'Relative: Chain', 'Evaluate the IK pole position as a child of the IK bones chain')),
+        description='How the IK pole position should be evaluated')
     ik_create_constraints: BoolProperty(name="Add IK Const.", default=False, description="Automatically creates IK constraints if the bone has none")
+    ik_1: StringProperty(default='')
+    ik_2: StringProperty(default='')
     location: BoolProperty(name="Location", description="Use location remapping, relative to the parent bone (local)", default=False)
     
     rot_add: FloatVectorProperty(default=(0.0, 0.0, 0.0), subtype='TRANSLATION', size=3)
@@ -3492,7 +3733,7 @@ def _import_config(self, custom_path = ""):
         
         # read props
         item_location = "False"# set with default values
-        item_ik_auto_pole = "False"
+        item_ik_auto_pole = 'ABSOLUTE'
         item_rot_add = Vector((0.0, 0.0, 0.0))
         item_loc_add = Vector((0.0, 0.0, 0.0))
         item_loc_mult = 1.0
@@ -3574,7 +3815,8 @@ def _import_config(self, custom_path = ""):
     scn.arp_remap_allow_root_update = False# disable it before assigning the set root value, otherwise it's interfering
     
     # set props
-    for key, value in sorted(preset_data.items()):       
+    print("PRESET DATA", preset_data)
+    for key, value in sorted(preset_data.items()):
         item = scn.bones_map.add()
         item.name = value[0]
         item.source_bone = key
@@ -3582,10 +3824,15 @@ def _import_config(self, custom_path = ""):
         item.ik = string_to_bool(value[2])
         item.ik_pole = value[3]
         item.location = string_to_bool(value[4])
-        item.ik_auto_pole = string_to_bool(value[5])
+        
+        if string_to_bool(value[5]) != None:# retro-compatibility, ik_auto_pole is now an Enum no more Boolean
+            item.ik_auto_pole = 'ABSOLUTE' if string_to_bool(value[5]) == False else 'RELATIVE_TARGET'
+        else:
+            item.ik_auto_pole = value[5]
+        
         item.rot_add = value[6]
         item.loc_add = value[7]
-        item.loc_mult = float(value[8]) 
+        item.loc_mult = float(value[8])
         item.ik_create_constraints = string_to_bool(value[9])
       
     scn.arp_remap_allow_root_update = True
@@ -3739,15 +3986,15 @@ class ARP_PT_auto_rig_remap_panel(Panel):
             row = layout.row()
             col = layout.column(align=True)
             col.operator("arp.remap_vse_automate_mocap_target", text="VSE Import and Setup mocap")
-            
-            
+                     
             if scn.arp_inputs_expand_ui:
                 layout.label(text="Source Armature:")
                 row = layout.row(align=True)
                 row.prop_search(scn, "source_rig", bpy.data, "objects", text="")
                 row.operator("arp.pick_object", text="", icon='EYEDROPPER').action = 'pick_source'
-             
+                
                 layout.prop(scn, "arp_retarget_in_place", text="In Place")
+                layout.operator("arp.batch_retarget", text="Multiple Source Anim...") #icon='SETTINGS') TODO
 
                 layout.label(text="Target Armature:")
                 row = layout.row(align=True)
@@ -3819,11 +4066,11 @@ class ARP_PT_auto_rig_remap_panel(Panel):
                         split2.enabled = False
                     split2.prop_search(scn.bones_map[scn.bones_map_index], "ik_pole", bpy.data.armatures[target_armature], "bones", text="Pole")
                     split2.operator("arp.pick_object", text="", icon='EYEDROPPER').action = 'pick_pole'
-                    row = box.row(align=True)
+                    row = box.row(align=False)
                     row.enabled = False
                     if scn.bones_map[scn.bones_map_index].ik:
                         row.enabled = True
-                    row.prop(scn.bones_map[scn.bones_map_index], "ik_auto_pole")
+                    row.prop(scn.bones_map[scn.bones_map_index], "ik_auto_pole", text='')
                     row.prop(scn.bones_map[scn.bones_map_index], "ik_create_constraints")
 
                     row = box.row(align=True)
@@ -3929,7 +4176,8 @@ class ARP_PT_auto_rig_remap_panel(Panel):
 
 ###########  REGISTER  ##################
 
-classes = (ARP_OT_clear_tweaks, ARP_OT_synchro_select, ARP_UL_items, ARP_OT_freeze_armature, ARP_OT_redefine_rest_pose, ARP_OT_auto_scale, ARP_OT_apply_offset, ARP_OT_cancel_redefine, ARP_OT_copy_bone_rest, ARP_OT_copy_raw_coordinates, ARP_OT_pick_object, ARP_OT_export_config, ARP_OT_import_config, ARP_OT_retarget, ARP_OT_build_bones_list, BoneRemapSettings, ARP_PT_auto_rig_remap_panel, ARP_OT_bind_only, ARP_MT_remap_import, ARP_MT_remap_export, VSE_Retarget_Mocap, ARP_OT_remap_export_preset, ARP_OT_import_config_preset, ARP_OT_save_pose_rest)
+classes = (ARP_OT_clear_tweaks, ARP_OT_synchro_select, ARP_UL_items, ARP_OT_freeze_armature, ARP_OT_redefine_rest_pose, ARP_OT_auto_scale, ARP_OT_apply_offset, ARP_OT_cancel_redefine, ARP_OT_copy_bone_rest, ARP_OT_copy_raw_coordinates, ARP_OT_pick_object, ARP_OT_export_config, ARP_OT_import_config, ARP_OT_retarget, ARP_OT_build_bones_list, BoneRemapSettings, ARP_PT_auto_rig_remap_panel, ARP_OT_bind_only, ARP_MT_remap_import, ARP_MT_remap_export, ARP_OT_remap_export_preset, ARP_OT_import_config_preset, ARP_OT_save_pose_rest, ARP_OT_batch_retarget,
+ARP_OT_toggle_action_remap, ARP_OT_enable_all_actions, ARP_OT_disable_all_actions, VSE_Retarget_Mocap)
 
 def update_arp_tab():
     try:
@@ -3979,7 +4227,7 @@ def register():
     bpy.types.Scene.source_action = StringProperty(name = "Source Action", default="", description="Source action data to load data from")
     bpy.types.Scene.arp_inherit_rot = BoolProperty(name="ARP Inherit Rotation", default=False, description="Auto-Rig Pro type armature only: if enabled, the bones hierarchy will be modified so that the arms and the head will inherit their parent bones rotation.")    
     bpy.types.Scene.additive_rot = FloatProperty(name="Additive Rotation", default=math.radians(10), unit="ROTATION")
-    bpy.types.Scene.additive_loc = FloatProperty(name="Additive Location", default=0.1)
+    bpy.types.Scene.additive_loc = FloatProperty(name="Additive Location", default=1.0)
     bpy.types.Scene.loc_mult = FloatProperty(name="Root Scale", default=0.9)
     bpy.types.Scene.name_search = StringProperty(name="Name search", default="")
     bpy.types.Scene.name_replace = StringProperty(name="Replace", default="")
@@ -3991,6 +4239,7 @@ def register():
     bpy.types.Scene.arp_retarget_decoupled_expand_ui = BoolProperty(name="", default=False, description="Show advanced features")
     bpy.types.Scene.arp_retarget_in_place = BoolProperty(default=False, description="Tries to compensate root motion so that the pelvis stay in place. Only works with cyclic animation (walk, run...)", update=update_in_place)
     bpy.types.Scene.arp_show_freeze_warn = BoolProperty(default=False, description="Show freeze armature warnings when retargetting, to freeze armature object transforms in case of issues")
+    bpy.types.Scene.batch_retarget = BoolProperty(default=False, description="Retarget multiple animations")
 
 
 def unregister():
@@ -4021,4 +4270,5 @@ def unregister():
     del bpy.types.Scene.arp_retarget_decoupled_expand_ui
     del bpy.types.Scene.arp_retarget_in_place
     del bpy.types.Scene.arp_show_freeze_warn
+    del bpy.types.Scene.batch_retarget
 

@@ -182,26 +182,292 @@ skulls_dict = {
     }
     
 skulls = [j for i, j in skulls_dict.items()]
+
 heads_dict = {
     'deform':'head.x',
     'control':'c_head.x',
     'scale_fix':'head_scale_fix.x',
     'shape_override':'c_p_head.x'
     }
+    
 head_deform = [heads_dict['deform']] + skulls
 head_control = [heads_dict['control']] + skulls
 head_bones = [j for i, j in heads_dict.items()] + skulls
 head_ref = ['head_ref.x']
 
+
+#   mouth
+mouth_bones_ref_dict = {'lips_top_mid': 'lips_top_ref.x',
+                        'lips_top': 'lips_top_ref',
+                        'lips_top_01': 'lips_top_01_ref',
+                        'lips_smile': 'lips_smile_ref',
+                        'lips_corner_mini': 'lips_corner_mini_ref',
+                        'lips_bot_mid':'lips_bot_ref.x',
+                        'lips_bot':'lips_bot_ref',
+                        'lips_bot_01': 'lips_bot_01_ref',
+                        'lips_roll_top': 'lips_roll_top_ref.x',
+                        'lips_roll_bot': 'lips_roll_bot_ref.x',                        
+                        'jaw':'jaw_ref.x' 
+                        }
+                        
+mouth_bones_dict = {
+                    'c_jawbone': {'name':'c_jawbone.x', 'deform':False, 'control':True},
+                    'jawbone': {'name':'jawbone.x', 'deform':True, 'control':False},                    
+                    'c_lips_bot_01_offset': {'name':'c_lips_bot_01_offset', 'deform':False, 'control':False},
+                    'c_lips_bot_01': {'name':'c_lips_bot_01', 'deform':True, 'control':True},
+                    'c_lips_bot_offset_mid': {'name':'c_lips_bot_offset.x', 'deform':False, 'control':False},
+                    'c_lips_bot_offset': {'name':'c_lips_bot_offset', 'deform':False, 'control':False},
+                    'c_lips_bot': {'name':'c_lips_bot', 'deform':True, 'control':True}, 
+                    'c_lips_bot_mid': {'name':'c_lips_bot.x', 'deform':True, 'control':True},
+                    'c_lips_roll_bot': {'name':'c_lips_roll_bot.x', 'deform':False, 'control':True},
+                    'c_lips_roll_top': {'name':'c_lips_roll_top.x', 'deform':False, 'control':True},                    
+                    'jaw_ret_bone': {'name':'jaw_ret_bone.x', 'deform':False, 'control':False},
+                    'c_lips_top_retain_mid': {'name':'c_lips_top_retain.x', 'deform':False, 'control':False},
+                    'c_lips_top_retain':{'name':'c_lips_top_retain', 'deform':False, 'control':False},
+                    'c_lips_top_01_retain': {'name':'c_lips_top_01_retain', 'deform':False, 'control':False},
+                    'c_lips_smile_retain': {'name':'c_lips_smile_retain', 'deform':False, 'control':False},
+                    'c_lips_bot_01_retain': {'name':'c_lips_bot_01_retain', 'deform':False, 'control':False},
+                    'c_lips_bot_retain': {'name':'c_lips_bot_retain', 'deform':False, 'control':False},
+                    'c_lips_bot_retain_mid': {'name':'c_lips_bot_retain.x', 'deform':False, 'control':False},
+                    'c_lips_top_offset_mid': {'name':'c_lips_top_offset.x', 'deform':False, 'control':False},
+                    'c_lips_top_offset': {'name':'c_lips_top_offset', 'deform':False, 'control':False},
+                    'c_lips_top_mid': {'name':'c_lips_top.x', 'deform':True, 'control':True},
+                    'c_lips_top': {'name':'c_lips_top', 'deform':True, 'control':True},
+                    'c_lips_top_01_offset': {'name':'c_lips_top_01_offset', 'deform':False, 'control':False},
+                    'c_lips_top_01': {'name':'c_lips_top_01', 'deform':True, 'control':True},
+                    'c_lips_smile_offset': {'name':'c_lips_smile_offset', 'deform':False, 'control':False},
+                    'c_lips_smile': {'name':'c_lips_smile', 'deform':True, 'control':True},
+                    'c_lips_corner_mini': {'name':'c_lips_corner_mini', 'deform':False, 'control':True},
+                    }
+                    
+                    
+mouth_bones_base = [j['name'] for i, j in mouth_bones_dict.items()]   
+mouth_ref_base = [j for i, j in mouth_bones_ref_dict.items()]   
+
+mouth_ref = []
+mouth_bones = []
+    
+for i in mouth_bones_base:
+    if i.endswith('.x'):
+        mouth_bones.append(i)
+    else:
+        mouth_bones.append(i+'.l')
+        mouth_bones.append(i+'.r')
+        
+for i in mouth_ref_base:
+    if i.endswith('.x'):
+        mouth_ref.append(i)
+    else:
+        mouth_ref.append(i+'.l')
+        mouth_ref.append(i+'.r')
+    
+    
+# cheeks
+cheek_bones_ref_dict = {'cheek_smile': 'cheek_smile_ref',
+                        'cheek_inflate': 'cheek_inflate_ref'}
+cheek_bones_dict = {'cheek_smile':{'name':'c_cheek_smile', 'deform':True, 'control':True}, 
+                    'cheek_inflate':{'name':'c_cheek_inflate', 'deform':True, 'control':True}
+                    }
+                    
+cheek_bones_base = [j['name'] for i, j in cheek_bones_dict.items()]
+cheek_ref_base = [j for i, j in cheek_bones_ref_dict.items()]
+    
+cheek_bones = []
+for i in cheek_bones_base:
+    cheek_bones.append(i+'.l')
+    cheek_bones.append(i+'.r')
+    
+cheek_ref = []
+for i in cheek_ref_base:
+    cheek_ref.append(i+'.l')
+    cheek_ref.append(i+'.r')
+    
+    
+#   chins
+chin_bones_ref_dict = {'chin_01': 'chin_01_ref.x', 
+                    'chin_02': 'chin_02_ref.x'}
+              
+chin_bones_dict = {'chin01': {'name':'c_chin_01.x', 'deform':True, 'control':True}, 
+                'chin02': {'name':'c_chin_02.x', 'deform':True, 'control':True}
+                }
+
+chin_bones = [j['name'] for i, j in chin_bones_dict.items()]
+chin_ref = [j for i, j in chin_bones_ref_dict.items()]
+    
+    
+#   nose
+nose_bones_ref_dict = {'nose_01': 'nose_01_ref.x',
+                        'nose_02': 'nose_02_ref.x', 
+                        'nose_03': 'nose_03_ref.x'}
+                    
+nose_bones_dict = {'nose_01': {'name':'c_nose_01.x', 'deform':True, 'control':True},
+                'nose_02':{'name':'c_nose_02.x', 'deform':True, 'control':True},
+                'nose_03': {'name':'c_nose_03.x', 'deform':True, 'control':True}
+                }
+
+nose_bones = [j['name'] for i, j in nose_bones_dict.items()]
+nose_ref = [j for i, j in nose_bones_ref_dict.items()]
+    
+    
+#   teeth
+teeth_bones_ref_dict = {'teeth_top_mid': 'teeth_top_ref.x',
+                        'teeth_top': 'teeth_top_ref',
+                        'teeth_bot_mid': 'teeth_bot_ref.x',
+                        'teeth_bot': 'teeth_bot_ref',
+                        }
+                        
+teeth_bones_dict = {'teeth_top_master': {'name':'c_teeth_top_master.x', 'deform':False, 'control':True},
+                    'c_teeth_top_mid': {'name':'c_teeth_top.x', 'deform':True, 'control':True},
+                    'c_teeth_top': {'name':'c_teeth_top', 'deform':True, 'control':True},                    
+                    'teeth_bot_master': {'name':'c_teeth_bot_master.x', 'deform':False, 'control':True},
+                    'c_teeth_bot_mid': {'name':'c_teeth_bot.x', 'deform':True, 'control':True},
+                    'c_teeth_bot': {'name':'c_teeth_bot', 'deform':True, 'control':True},
+                    }
+
+teeth_bones_base = [teeth_bones_dict[i]['name'] for i in teeth_bones_dict]
+teeth_ref_base = [j for i, j in teeth_bones_ref_dict.items()]
+
+teeth_bones = []
+for i in teeth_bones_base:
+    if i.endswith('.x'):
+        teeth_bones.append(i)
+    else:
+        teeth_bones.append(i+'.l')
+        teeth_bones.append(i+'.r')
+        
+teeth_ref = []
+for i in teeth_ref_base:
+    if i.endswith('.x'):
+        teeth_ref.append(i)
+    else:
+        teeth_ref.append(i+'.l')
+        teeth_ref.append(i+'.r')
+    
+# tongues
+
+tongue_bones_ref_dict = {'tong_01':'tong_01_ref.x',
+                        'tong_02':'tong_02_ref.x',
+                        'tong_03':'tong_03_ref.x'
+                        }
+                        
+tongue_bones_dict = {'c_tong_01': {'name':'c_tong_01.x', 'deform':False, 'control':True},
+                    'c_tong_02': {'name':'c_tong_02.x', 'deform':False, 'control':True},
+                    'c_tong_03': {'name':'c_tong_03.x', 'deform':False, 'control':True},
+                    'tong_01': {'name':'tong_01.x', 'deform':True, 'control':False},
+                    'tong_02': {'name':'tong_02.x', 'deform':True, 'control':False},
+                    'tong_03': {'name':'tong_03.x', 'deform':True, 'control':False}
+                    }
+                    
+tongue_ref = [j for i, j in tongue_bones_ref_dict.items()]
+tongue_bones = [tongue_bones_dict[i]['name'] for i in tongue_bones_dict]
+
+    
+    
+# eyes
+eye_bones_ref_dict = {'eye_offset': 'eye_offset_ref', 
+                    'eyelod_top': 'eyelid_top_ref', 
+                    'eyelid_bot': 'eyelid_bot_ref', 
+                    'eyelid_top_01': 'eyelid_top_01_ref', 
+                    'eyelid_top_02': 'eyelid_top_02_ref', 
+                    'eyelid_top_03': 'eyelid_top_03_ref', 
+                    'eyelid_bot_01': 'eyelid_bot_01_ref', 
+                    'eyelid_bot_02': 'eyelid_bot_02_ref', 
+                    'eyelid_bot_03': 'eyelid_bot_03_ref', 
+                    'eyelid_corner_01': 'eyelid_corner_01_ref', 
+                    'eyelid_corner_02': 'eyelid_corner_02_ref',
+                    }
+          
+eye_bones_dict = {
+                   'eye_ref_track': {'name':'c_eye_ref_track', 'deform':True, 'control':False},
+                   'eye_offset': {'name':'c_eye_offset', 'deform':True, 'control':True},
+                   'eyelid_base': {'name':'c_eyelid_base', 'deform':False, 'control':False},
+                   'eyelid_top': {'name':'eyelid_top', 'deform':False, 'control':False},
+                   'eyelid_top_01': {'name':'c_eyelid_top_01', 'deform':True, 'control':True},
+                   'eyelid_top_02': {'name': 'c_eyelid_top_02', 'deform':True, 'control':True},
+                   'eyelid_top_03': {'name': 'c_eyelid_top_03', 'deform':True, 'control':True},
+                   'eyelid_bot': {'name': 'eyelid_bot', 'deform':False, 'control':False},
+                   'eyelid_bot_01': {'name': 'c_eyelid_bot_01', 'deform':True, 'control':True},
+                   'eyelid_bot_02': {'name': 'c_eyelid_bot_02', 'deform':True, 'control':True},
+                   'eyelid_bot_03': {'name': 'c_eyelid_bot_03', 'deform':True, 'control':True},
+                   'c_eye':  {'name': 'c_eye', 'deform':True, 'control':True},
+                   'c_eye_ref': {'name': 'c_eye_ref', 'deform':False, 'control':True},
+                   'eyelid_corner_01' : {'name': 'c_eyelid_corner_01', 'deform':True, 'control':True},
+                   'eyelid_corner_02': {'name': 'c_eyelid_corner_02', 'deform':True, 'control':True},
+                   'c_eyelid_top': {'name': 'c_eyelid_top', 'deform':False, 'control':True},
+                   'c_eyelid_bot': {'name': 'c_eyelid_bot', 'deform':False, 'control':True},
+                   'c_eye_target': {'name': 'c_eye_target', 'deform':False, 'control':True},
+                   }
+                   
+eye_bones = [j['name'] for i, j in eye_bones_dict.items()] 
+eye_ref = [j for i, j in eye_bones_ref_dict.items()] 
+    
+eye_bones_mid = ['c_eye_target.x']
+eye_bones_left = [i+'.l' for i in eye_bones] + [i+'.l' for i in eye_ref]
+eye_bones_right = [i+'.r' for i in eye_bones] + [i+'.r' for i in eye_ref]
+
+
+# eyebrows
+eyebrow_bones_ref_dict = {'eyebrow_full': 'eyebrow_full_ref', 
+                        'eyebrow_03': 'eyebrow_03_ref', 
+                        'eyebrow_02': 'eyebrow_02_ref', 
+                        'eyebrow_01': 'eyebrow_01_ref', 
+                        'eyebrow_01_end': 'eyebrow_01_end_ref'
+                        }
+
+eyebrow_bones_dict = {
+                    'eyebrow_full': {'name':'c_eyebrow_full', 'deform':False, 'control':True},
+                    'eyebrow_03': {'name':'c_eyebrow_03', 'deform':True, 'control':True},
+                    'eyebrow_02': {'name':'c_eyebrow_02', 'deform':True, 'control':True},
+                    'eyebrow_01': {'name':'c_eyebrow_01', 'deform':True, 'control':True},
+                    'eyebrow_01_end': {'name':'c_eyebrow_01_end', 'deform':True, 'control':True}
+                    }
+                        
+eyebrow_bones = [j['name'] for i, j in eyebrow_bones_dict.items()]
+eyebrow_ref = [j for i, j in eyebrow_bones_ref_dict.items()]
+    
+eyebrow_bones_left = [i+'.l' for i in eyebrow_bones] + [i+'.l' for i in eyebrow_ref]
+eyebrow_bones_right = [i+'.r' for i in eyebrow_bones] + [i+'.r' for i in eyebrow_ref]
+
+    
+
 #   facial
-facial_ref = ['eyebrow_full_ref', 'eyebrow_03_ref', 'eyebrow_02_ref', 'eyebrow_01_ref', 'eyebrow_01_end_ref', 'lips_top_ref.x', 'lips_top_ref', 'lips_top_01_ref', 'lips_smile_ref', 'lips_corner_mini_ref', 'lips_bot_ref.x', 'lips_bot_ref', 'lips_bot_01_ref', 'lips_roll_top_ref.x', 'lips_roll_bot_ref.x', 'tong_01_ref.x', 'tong_02_ref.x', 'tong_03_ref.x', 'teeth_bot_ref.x', 'teeth_bot_ref', 'chin_02_ref.x', 'chin_01_ref.x', 'teeth_top_ref.x', 'teeth_top_ref', 'eye_offset_ref', 'eyelid_top_ref', 'eyelid_bot_ref', 'eyelid_top_01_ref', 'eyelid_top_02_ref', 'eyelid_top_03_ref', 'eyelid_bot_01_ref', 'eyelid_bot_02_ref', 'eyelid_bot_03_ref', 'eyelid_corner_01_ref', 'eyelid_corner_02_ref', 'cheek_smile_ref', 'cheek_inflate_ref', 'nose_01_ref.x', 'nose_02_ref.x', 'nose_03_ref.x', 'jaw_ref.x']  
+facial_ref_dict = {}            
+facial_ref_dict.update(mouth_bones_ref_dict)
+facial_ref_dict.update(cheek_bones_ref_dict)
+facial_ref_dict.update(chin_bones_ref_dict)
+facial_ref_dict.update(nose_bones_ref_dict)
+facial_ref_dict.update(eye_bones_ref_dict)
+facial_ref_dict.update(eyebrow_bones_ref_dict)
+facial_ref_dict.update(teeth_bones_ref_dict)
+facial_ref_dict.update(tongue_bones_ref_dict)
 
-facial_deform =['c_teeth_bot.x', 'c_teeth_top', 'c_teeth_bot', 'c_teeth_top.x', 'jawbone.x', 'c_lips_bot', 'c_lips_bot_01', 'c_lips_bot.x', 'c_lips_smile', 'c_lips_top.x', 'c_lips_top', 'c_lips_top_01',  'c_eye', 'c_chin_01.x', 'c_chin_02.x', 'c_eye_offset', 'c_cheek_smile', 'c_nose_03.x', 'c_nose_01.x', 'c_nose_02.x', 'c_cheek_inflate', 'c_eye_ref_track', 'tong_03.x', 'tong_02.x', 'tong_01.x', 'c_eyebrow_03', 'c_eyebrow_02', 'c_eyebrow_01', 'c_eyebrow_01_end', 'c_eyelid_top_01', 'c_eyelid_top_02', 'c_eyelid_top_03', 'c_eyelid_bot_01', 'c_eyelid_bot_02', 'c_eyelid_bot_03', 'c_eyelid_corner_01', 'c_eyelid_corner_02']
+facial_ref = [j for i, j in facial_ref_dict.items()]
 
-facial_control = ['c_teeth_top_master.x', 'c_teeth_bot_master.x', 'c_teeth_bot.x', 'c_teeth_top', 'c_teeth_bot', 'c_teeth_top.x', 'c_tong_03.x', 'c_tong_02.x', 'c_tong_01.x', 'c_cheek_inflate', 'c_nose_03.x', 'c_nose_01.x', 'c_nose_02.x', 'c_eye_offset', 'c_cheek_smile', 'c_chin_01.x', 'c_chin_02.x', 'c_eye', 'c_lips_smile', 'c_lips_top', 'c_lips_top_01', 'c_lips_top.x', 'c_lips_bot', 'c_lips_bot_01', 'c_lips_bot.x', 'c_jawbone.x', 'c_tong_01.x', 'c_tong_02.x', 'c_tong_03.x', 'c_lips_corner_mini', 'c_lips_roll_top.x', 'c_lips_roll_bot.x', 'c_eyelid_top', 'c_eyelid_bot', 'c_eyebrow_full', 'c_eyebrow_03', 'c_eyebrow_02', 'c_eyebrow_01', 'c_eyebrow_01_end', 'c_eye_target.x', 'c_eye_target', 'c_eye_ref', 'c_eyelid_top_01', 'c_eyelid_top_02', 'c_eyelid_top_03', 'c_eyelid_bot_01', 'c_eyelid_bot_02', 'c_eyelid_bot_03', 'c_eyelid_corner_01', 'c_eyelid_corner_02']
+mouth_deform = [mouth_bones_dict[i]['name'] for i in mouth_bones_dict if mouth_bones_dict[i]['deform']] 
+cheek_deform = [cheek_bones_dict[i]['name'] for i in cheek_bones_dict if cheek_bones_dict[i]['deform']]
+chin_deform = [chin_bones_dict[i]['name'] for i in chin_bones_dict if chin_bones_dict[i]['deform']]
+nose_deform = [nose_bones_dict[i]['name'] for i in nose_bones_dict if nose_bones_dict[i]['deform']]
+eye_deform = [eye_bones_dict[i]['name'] for i in eye_bones_dict if eye_bones_dict[i]['deform']]
+eyebrow_deform = [eyebrow_bones_dict[i]['name'] for i in eyebrow_bones_dict if eyebrow_bones_dict[i]['deform']]
+teeth_deform = [teeth_bones_dict[i]['name'] for i in teeth_bones_dict if teeth_bones_dict[i]['deform']]
+tongue_deform = [tongue_bones_dict[i]['name'] for i in tongue_bones_dict if tongue_bones_dict[i]['deform']]
 
-facial_bones = ['c_eye_ref_track', 'c_jawbone.x', 'jawbone.x', 'c_tong_01.x', 'c_tong_02.x', 'c_tong_03.x', 'tong_03.x', 'tong_02.x', 'tong_01.x', 'c_chin_01.x', 'c_chin_02.x', 'c_teeth_bot_master.x', 'c_teeth_bot.x', 'c_teeth_bot', 'c_lips_bot_01_offset', 'c_lips_bot_01', 'c_lips_bot_offset', 'c_lips_bot', 'c_lips_bot_offset.x', 'c_lips_bot.x', 'c_lips_roll_bot.x', 'c_lips_roll_top.x', 'c_teeth_top_master.x', 'c_teeth_top.x', 'c_teeth_top', 'jaw_ret_bone.x', 'c_lips_top_retain.x', 'c_lips_top_retain', 'c_lips_top_01_retain', 'c_lips_smile_retain', 'c_lips_bot_01_retain', 'c_lips_bot_retain', 'c_lips_bot_retain.x', 'c_lips_top_offset.x', 'c_lips_top.x', 'c_lips_top_offset', 'c_lips_top', 'c_lips_top_01_offset', 'c_lips_top_01', 'c_lips_smile_offset', 'c_lips_smile', 'c_lips_corner_mini', 'c_eye_offset', 'c_eyelid_base', 'c_eyelid_top', 'c_eyelid_top_01', 'c_eyelid_top_02', 'c_eyelid_top_03', 'c_eyelid_bot', 'c_eyelid_bot_01', 'c_eyelid_bot_02', 'c_eyelid_bot_03', 'c_eye', 'c_eye_ref', 'c_eyelid_corner_01', 'c_eyelid_corner_02', 'eyelid_top', 'eyelid_bot', 'c_cheek_smile', 'c_nose_03.x', 'c_nose_01.x', 'c_nose_02.x', 'c_cheek_inflate', 'c_eyebrow_full', 'c_eyebrow_03', 'c_eyebrow_02', 'c_eyebrow_01', 'c_eyebrow_01_end', 'c_eye_target.x', 'c_eye_target', 'lips_top_follow', 'lips_top_01_follow', 'lips_bot_follow', 'lips_bot_01_follow']
+facial_deform = mouth_deform + cheek_deform + chin_deform + nose_deform + eye_deform + eyebrow_deform + teeth_deform + tongue_deform
 
+mouth_control = [mouth_bones_dict[i]['name'] for i in mouth_bones_dict if mouth_bones_dict[i]['control']]
+cheek_control = [cheek_bones_dict[i]['name'] for i in cheek_bones_dict if cheek_bones_dict[i]['control']]
+chin_control = [chin_bones_dict[i]['name'] for i in chin_bones_dict if chin_bones_dict[i]['control']]
+nose_control = [nose_bones_dict[i]['name'] for i in nose_bones_dict if nose_bones_dict[i]['control']]
+eye_control = [eye_bones_dict[i]['name'] for i in eye_bones_dict if eye_bones_dict[i]['control']]
+eyebrow_control = [eyebrow_bones_dict[i]['name'] for i in eyebrow_bones_dict if eyebrow_bones_dict[i]['control']]
+teeth_control = [teeth_bones_dict[i]['name'] for i in teeth_bones_dict if teeth_bones_dict[i]['control']]
+tongue_control = [tongue_bones_dict[i]['name'] for i in tongue_bones_dict if tongue_bones_dict[i]['control']]
+
+facial_control = mouth_control + cheek_control + chin_control + nose_control + eye_control + eyebrow_control + teeth_control + tongue_control
+                
+#facial_control = ['c_teeth_top_master.x', 'c_teeth_bot_master.x', mouth_bones_dict['c_teeth_bot_mid'], 'c_teeth_top', 'c_teeth_bot', 'c_teeth_top.x', 'c_tong_03.x', 'c_tong_02.x', 'c_tong_01.x', 'c_cheek_inflate', 'c_nose_03.x', 'c_nose_01.x', 'c_nose_02.x', 'c_eye_offset', 'c_cheek_smile', 'c_chin_01.x', 'c_chin_02.x', 'c_eye', 'c_lips_smile', 'c_lips_top', 'c_lips_top_01', 'c_lips_top.x', 'c_lips_bot', 'c_lips_bot_01', 'c_lips_bot.x', 'c_jawbone.x', 'c_tong_01.x', 'c_tong_02.x', 'c_tong_03.x', 'c_lips_corner_mini', 'c_lips_roll_top.x', 'c_lips_roll_bot.x', 'c_eyelid_top', 'c_eyelid_bot', 'c_eyebrow_full', 'c_eyebrow_03', 'c_eyebrow_02', 'c_eyebrow_01', 'c_eyebrow_01_end', 'c_eye_target.x', 'c_eye_target', 'c_eye_ref', 'c_eyelid_top_01', 'c_eyelid_top_02', 'c_eyelid_top_03', 'c_eyelid_bot_01', 'c_eyelid_bot_02', 'c_eyelid_bot_03', 'c_eyelid_corner_01', 'c_eyelid_corner_02']
+
+facial_bones = eyebrow_bones + eye_bones_mid + eye_bones + nose_bones + chin_bones + cheek_bones_base + mouth_bones_base + teeth_bones_base + tongue_bones
 
 # EARS
 ear_ref = ['ear_01_ref', 'ear_02_ref']
@@ -218,10 +484,24 @@ def get_ears_controllers(side):
 
 
 # NECK
-neck_deform = ['c_neck_01.x', 'neck.x']
-neck_control = ['c_neck.x', 'c_neck_01.x']
-neck_bones = ['c_neck.x', 'c_neck_01.x', 'neck.x', 'c_p_neck.x', 'c_p_neck_01.x', 'neck_twist.x']
-neck_ref = ['neck_ref.x']
+neck_bones_dict = {
+                    'control': 'c_neck.x',
+                    'control_01': 'c_neck_01.x',
+                    'deform': 'neck.x',
+                    'c_p': 'c_p_neck.x',
+                    'c_p_01': 'c_p_neck_01.x',
+                    'twist': 'neck_twist.x',
+                    'twist_target': 'neck_twist_tar.x',
+                    }
+                    
+neck_ref_dict = {'neck': 'neck_ref.x'}                    
+neck_deform = [neck_bones_dict['control_01'], neck_bones_dict['deform']]
+neck_control = [neck_bones_dict['control'], neck_bones_dict['control_01']]
+neck_bones = [j for i, j in neck_bones_dict.items()]
+neck_ref = [neck_ref_dict['neck']]
+
+subnecks = ['subneck_']
+
 
 
 # SPINE
@@ -279,11 +559,29 @@ spine01_control = [spine_bones_dict['c_spine_01'], spine_bones_dict['c_spine_01_
 
 spine_ref_dict = {'root':'root_ref.x', 'spine_01':get_spine_name('ref', 1), 'spine_02': get_spine_name('ref', 2)}
 
+bot_ref_dict = {'bot': 'bot_bend_ref'}
+
+bot_dict = {'c_bot': 'c_bot_bend'}
+
 spine_ref_list = [j for i, j in spine_ref_dict.items()]
 
 spine_bones_rig_add = [spine_bones_dict['c_waist_bend'], 'c_waist_bend_end.x', 'epaules_bend.x']
 
 spine_control = spine01_control + spine02_control + [spine_bones_dict['c_root'], spine_bones_dict['c_root_master'], spine_bones_dict['c_root_bend']]
+
+
+# Breast
+breast_ref_dict = {
+                    '01':'breast_01_ref',
+                    '02':'breast_02_ref'
+                }
+                
+breast_bones_dict = {
+                    '01':'c_breast_01',
+                    '02':'c_breast_02',
+                }
+                
+breast_bones = [j for i, j in breast_bones_dict.items()]
 
 
 # SPLINE IK
