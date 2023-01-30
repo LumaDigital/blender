@@ -60,7 +60,65 @@ class ARP_MT_remap_export(Menu):
     def draw(self, _context):   
         layout = self.layout
         layout.operator("arp.remap_export_preset", text="Save as New Preset")  
+
+class VSE_Retarget_Mocap(bpy.types.Operator):
+    """VSE Tool to automatically import, set up motion-capture (.bvh) and ready the rigs for retargetting"""  
+    
+    bl_idname = "arp.remap_vse_automate_mocap_target"
+    bl_label = "Mocap retarget"
+    
+    _mocap_file_path = None
+    _bones_preset_path = None
+    _mocap_obj = None
+    _rig_obj = None
+    
+    def execute(self, context):
         
+        # Assign UI variables
+        self._mocap_file_path = bpy.context.scene.vse_bvh_path
+        self._bones_preset_path = bpy.context.scene.vse_bones_preset_path
+
+        if self.validate_mocap_Path():
+            self.target_mocap()
+            
+        return {'FINISHED'}  
+    
+    def target_mocap(self):
+        
+        print("\n=====================================================================================")
+        print("VSE Automation\n\nLoading motion capture file")
+        
+        
+        bpy.ops.import_anim.bvh(filepath=self._mocap_file_path, global_scale= 0.01, use_fps_scale= True)
+        self._mocap_obj = bpy.context.view_layer.objects.active 
+        self._rig_obj = bpy.data.objects[bpy.context.scene.vse_rig_name]
+        
+        bpy.context.scene.source_rig = self._mocap_obj.name
+        update_source_rig(self, bpy.context)
+        
+        bpy.context.scene.target_rig = self._rig_obj.name
+        update_target_rig(self, bpy.context)
+        
+        ARP_OT_build_bones_list.execute(self, bpy.context)
+        
+        _import_config(self, self._bones_preset_path)
+        
+        bpy.context.scene.arp_show_freeze_warn = True
+        bpy.ops.arp.retarget('INVOKE_DEFAULT')
+    
+    def validate_mocap_Path(self):
+        if (self._mocap_file_path[-3:] != "bvh"):
+            self.show_message_box("Please select .bvh file", "File not bvh!", 'ERROR')
+            return False
+        
+        return True  
+    
+    def show_message_box(self, message = "", title = "Message Box", icon = 'INFO'):
+        def draw(self, context):
+            self.layout.label(text = message)
+            
+        bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+            
         
 class ARP_OT_remap_export_preset(Operator):
     """Export as custom preset"""
@@ -644,10 +702,11 @@ def check_retargetting_inputs(self):
             bone.name = ''
             duplis_found = True
             
-    if duplis_found:
-        log_error_state()
-        self.report({'ERROR'}, 'Some target bones were assigned multiple times, duplicates were cleared automatically')
-        return {'FINISHED'}
+    # VSE We don't need the whole invoke call to be interupted by an essentially one time warning
+    #if duplis_found:
+    #    log_error_state()
+    #    self.report({'ERROR'}, 'Some target bones were assigned multiple times, duplicates were cleared automatically')
+    #    return {'FINISHED'}
 
                     
 def check_armature_init_transforms(self):
@@ -926,7 +985,7 @@ class ARP_OT_retarget(Operator):
         self.show_freeze_warn = scn.arp_show_freeze_warn
         
         wm = context.window_manager
-        self.force_source_freeze = 'NO'
+        self.force_source_freeze = 'YES'
         check_retargetting_inputs(self)
         check_armature_init_transforms(self)
         
@@ -3375,7 +3434,7 @@ def _export_config(filepath):
     file.close()
 
     
-def _import_config(self):
+def _import_config(self, custom_path = ""):
     context = bpy.context
     scn = context.scene
     bones_not_found = []
@@ -3387,7 +3446,12 @@ def _import_config(self):
     if target_arm == None or source_arm == None:
         return
         
-    filepath = self.filepath
+        
+    if custom_path != "":
+        filepath = custom_path
+    else:    
+        filepath = self.filepath
+    
     file = None
     try:
         file = open(filepath, 'rU')   
@@ -3658,6 +3722,25 @@ class ARP_PT_auto_rig_remap_panel(Panel):
             row = layout.row()
             row.prop(scn, "arp_inputs_expand_ui", icon="TRIA_DOWN" if scn.arp_inputs_expand_ui else "TRIA_RIGHT", icon_only=True, emboss=False)
             row.label(text="Inputs:")
+            
+            # VSE Work #
+            row = layout.row()
+            row.label(text="VSE Mocap Path (.bvh):")
+            row = layout.row()
+            row.prop(scn, "vse_bvh_path")
+            row = layout.row()
+            row.label(text="VSE Bones Preset Path (.bmap):")
+            row = layout.row()
+            row.prop(scn, "vse_bones_preset_path")
+            row = layout.row()
+            row.label(text="VSE Rig name:")
+            row = layout.row()
+            row.prop(scn, "vse_rig_name")
+            row = layout.row()
+            col = layout.column(align=True)
+            col.operator("arp.remap_vse_automate_mocap_target", text="VSE Import and Setup mocap")
+            
+            
             if scn.arp_inputs_expand_ui:
                 layout.label(text="Source Armature:")
                 row = layout.row(align=True)
@@ -3846,7 +3929,7 @@ class ARP_PT_auto_rig_remap_panel(Panel):
 
 ###########  REGISTER  ##################
 
-classes = (ARP_OT_clear_tweaks, ARP_OT_synchro_select, ARP_UL_items, ARP_OT_freeze_armature, ARP_OT_redefine_rest_pose, ARP_OT_auto_scale, ARP_OT_apply_offset, ARP_OT_cancel_redefine, ARP_OT_copy_bone_rest, ARP_OT_copy_raw_coordinates, ARP_OT_pick_object, ARP_OT_export_config, ARP_OT_import_config, ARP_OT_retarget, ARP_OT_build_bones_list, BoneRemapSettings, ARP_PT_auto_rig_remap_panel, ARP_OT_bind_only, ARP_MT_remap_import, ARP_MT_remap_export, ARP_OT_remap_export_preset, ARP_OT_import_config_preset, ARP_OT_save_pose_rest)
+classes = (ARP_OT_clear_tweaks, ARP_OT_synchro_select, ARP_UL_items, ARP_OT_freeze_armature, ARP_OT_redefine_rest_pose, ARP_OT_auto_scale, ARP_OT_apply_offset, ARP_OT_cancel_redefine, ARP_OT_copy_bone_rest, ARP_OT_copy_raw_coordinates, ARP_OT_pick_object, ARP_OT_export_config, ARP_OT_import_config, ARP_OT_retarget, ARP_OT_build_bones_list, BoneRemapSettings, ARP_PT_auto_rig_remap_panel, ARP_OT_bind_only, ARP_MT_remap_import, ARP_MT_remap_export, VSE_Retarget_Mocap, ARP_OT_remap_export_preset, ARP_OT_import_config_preset, ARP_OT_save_pose_rest)
 
 def update_arp_tab():
     try:
@@ -3864,6 +3947,28 @@ def register():
 
     update_arp_tab()
     update_remap_presets()
+    
+    # VSE #
+    
+    bpy.types.Scene.vse_bvh_path  = ( 
+        bpy.props.StringProperty(
+            name = "",
+            description = "File path location for the motion capture you intend to apply to the model",
+            subtype = "FILE_PATH",
+            default = "N:\\Cricket\\assets\\MoCap\\"))
+            
+    bpy.types.Scene.vse_bones_preset_path  = ( 
+        bpy.props.StringProperty(
+            name = "",
+            description = "File path location for bones preset (.bmap)",
+            subtype = "FILE_PATH",
+            default = "N:\\Cricket\\assets\\Blender_Remap_Presets\\Bwler_BVH_FK_remap_preset.bmap"))
+            
+    bpy.types.Scene.vse_rig_name = ( 
+        bpy.props.StringProperty(
+            name = "",
+            description = "Name of the model object you want to apply the motion capture to",
+            default = "cricket_player_rig"))
 
     bpy.types.Scene.target_rig = StringProperty(name = "Target Rig", default="", description="Destination armature to re-target the action", update=update_target_rig)
     bpy.types.Scene.source_rig = StringProperty(name = "Source Rig", default="", description="Source rig armature to take action from", update=update_source_rig)
