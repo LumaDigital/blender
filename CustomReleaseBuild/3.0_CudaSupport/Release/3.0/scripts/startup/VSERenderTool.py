@@ -284,21 +284,26 @@ class Render_And_Composite(bpy.types.Operator):
         bpy.data.materials[material_name].node_tree.nodes["Mix.001"].inputs[0].default_value = 0 # Node name has been change but the action still returns "Mix.001"
         
     def _assign_materials_to_children_recursive(self, obj, material):
-        
+
         background_material = bpy.data.materials[self._background_material_name]
+
+        if len(obj.children) > 0:
         
-        for child in obj.children:          
-            bpy.context.view_layer.objects.active = child  
-                    
-            if (bpy.context.view_layer.objects.active.data is not None):
+            for child in obj.children:          
+                bpy.context.view_layer.objects.active = child  
+
+                if (bpy.context.view_layer.objects.active.data is not None):
                 
-                if any(substring in child.name.lower() for substring in self._background_items): # is background item
-                    bpy.context.view_layer.objects.active.data.materials[0] = background_material
-                else:
-                    bpy.context.view_layer.objects.active.data.materials[0] = material
-                    bpy.context.view_layer.objects.active.pass_index = 1
+                    if any(substring in child.name.lower() for substring in self._background_items): # is background item
+                        bpy.context.view_layer.objects.active.data.materials[0] = background_material
+                    else:
+                        bpy.context.view_layer.objects.active.data.materials[0] = material
+                        bpy.context.view_layer.objects.active.pass_index = 1
                 
-            self._assign_materials_to_children_recursive(child, material)
+                self._assign_materials_to_children_recursive(child, material)
+        else: # not a parent to all geos
+            bpy.context.view_layer.objects.active = obj
+            bpy.context.view_layer.objects.active.data.materials[0] = material
             
     
 class Render_Tool_Panel(bpy.types.Panel):
