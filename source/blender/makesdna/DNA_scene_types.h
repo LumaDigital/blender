@@ -401,7 +401,7 @@ typedef struct ImageFormatData {
    * not a flag, only set 1 at a time. */
   char depth;
 
-  /** R_IMF_PLANES_BW, R_IMF_PLANES_RGB, R_IMF_PLANES_RGBA. */
+  /** R_IMF_PLANES_BW, R_IMF_PLANES_MAP, R_IMF_PLANES_RGB, R_IMF_PLANES_RGBA. */
   char planes;
   /** Generic options for all image types, alpha Z-buffer. */
   char flag;
@@ -502,6 +502,7 @@ typedef enum eImageFormatDepth {
 /** #ImageFormatData.planes */
 #define R_IMF_PLANES_RGB 24
 #define R_IMF_PLANES_RGBA 32
+#define R_IMF_PLANES_MAP 46
 #define R_IMF_PLANES_BW 8
 
 /** #ImageFormatData.exr_codec */
