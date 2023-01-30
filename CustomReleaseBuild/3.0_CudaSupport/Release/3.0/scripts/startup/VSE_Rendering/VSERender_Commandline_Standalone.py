@@ -28,7 +28,8 @@ def Apply_Settings():
     opts, args = getopt.getopt(
         sys.argv[13:],
         "",
-        ["back_out=",
+        ["cycles-device=",
+            "back_out=",
             "actors_out=",
             "uvs_out=",
             "render_back=",
