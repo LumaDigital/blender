@@ -96,7 +96,7 @@ void OutputOpenExrSingleLayerMultiViewOperation::deinit_execution()
                      datatype_,
                      view_name_,
                      width,
-                     format_->depth == R_IMF_CHAN_DEPTH_16,
+                     format_.depth == R_IMF_CHAN_DEPTH_16,
                      output_buffer_,
                      false);
 
