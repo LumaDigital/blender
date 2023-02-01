@@ -68,8 +68,9 @@ void ntreeCompositOutputFileUniquePath(ListBase *list,
   }
 
   sockdata = (NodeImageMultiFileSocket *)sock->storage;
-  BLI_uniquename_cb(
-      unique_path_unique_check, &data, defname, delim, sockdata->path, sizeof(sockdata->path));
+  // VSE MG: commented out so duplicate layer names can be used with the intention of using custom/varying channels. 
+  /*BLI_uniquename_cb(
+      unique_path_unique_check, &data, defname, delim, sockdata->path, sizeof(sockdata->path));*/
 }
 
 /* find unique EXR layer */
@@ -109,8 +110,9 @@ void ntreeCompositOutputFileUniqueLayer(ListBase *list,
   }
 
   NodeImageMultiFileSocket *sockdata = (NodeImageMultiFileSocket *)sock->storage;
-  BLI_uniquename_cb(
-      unique_layer_unique_check, &data, defname, delim, sockdata->layer, sizeof(sockdata->layer));
+  // VSE MG: commented out so duplicate layer names can be used with the intention of using custom/varying channels. 
+  /*BLI_uniquename_cb(
+      unique_layer_unique_check, &data, defname, delim, sockdata->layer, sizeof(sockdata->layer));*/
 }
 
 bNodeSocket *ntreeCompositOutputFileAddSocket(bNodeTree *ntree,

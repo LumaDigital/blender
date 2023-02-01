@@ -241,9 +241,7 @@ bool BLI_uniquename_cb(UniquenameCheckCallback unique_check,
     BLI_strncpy(name, defname, name_len);
   }
 
-  // VSE MG: commented out so duplicate layer names can be used with the 
-  // intention of using custom/varying channels. 
-  /*if (unique_check(arg, name))
+  if (unique_check(arg, name))
   {
     char numstr[16];
     char *tempname = alloca(name_len);
@@ -270,7 +268,7 @@ bool BLI_uniquename_cb(UniquenameCheckCallback unique_check,
     BLI_strncpy(name, tempname, name_len);
 
     return true;
-  }*/
+  }
 
   return false;
 }
