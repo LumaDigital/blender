@@ -975,15 +975,10 @@ void uiTemplateImageSettings(uiLayout *layout, PointerRNA *imfptr, bool color_ma
 
   uiItemR(col, imfptr, "file_format", 0, NULL, ICON_NONE);
 
-  /* Multi-layer always saves raw unmodified channels. */
-  if (imf->imtype != R_IMF_IMTYPE_MULTILAYER) {
-    uiItemR(uiLayoutRow(col, true),
-            imfptr,
-            "color_mode",
-            UI_ITEM_R_EXPAND,
-            IFACE_("Color"),
-            ICON_NONE);
-  }
+  /* Original has Multi-layer always saves raw unmodified channels.
+  For VSE we expose it so we can select the map channels setting */
+  uiItemR(
+      uiLayoutRow(col, true), imfptr, "color_mode", UI_ITEM_R_EXPAND, IFACE_("Color"), ICON_NONE);
 
   /* only display depth setting if multiple depths can be used */
   if (ELEM(depth_ok,
