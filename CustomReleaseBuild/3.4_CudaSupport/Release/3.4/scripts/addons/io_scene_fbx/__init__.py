@@ -1,28 +1,10 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 bl_info = {
     "name": "FBX format",
     "author": "Campbell Barton, Bastien Montagne, Jens Restemeier",
-    "version": (4, 29, 0),
-    "blender": (2, 90, 0),
+    "version": (4, 37, 1),
+    "blender": (3, 4, 0),
     "location": "File > Import-Export",
     "description": "FBX IO meshes, UV's, vertex colors, materials, textures, cameras, lamps and actions",
     "warning": "",
@@ -106,6 +88,15 @@ class ImportFBX(bpy.types.Operator, ImportHelper):
             name="Custom Normals",
             description="Import custom normals, if available (otherwise Blender will recompute them)",
             default=True,
+            )
+    colors_type: EnumProperty(
+            name="Vertex Colors",
+            items=(('NONE', "None", "Do not import color attributes"),
+                   ('SRGB', "sRGB", "Expect file colors in sRGB color space"),
+                   ('LINEAR', "Linear", "Expect file colors in linear color space"),
+                   ),
+            description="Import vertex color attributes",
+            default='SRGB',
             )
 
     use_image_search: BoolProperty(
@@ -248,6 +239,7 @@ class FBX_PT_import_include(bpy.types.Panel):
         sub.enabled = operator.use_custom_props
         sub.prop(operator, "use_custom_props_enum_as_string")
         layout.prop(operator, "use_image_search")
+        layout.prop(operator, "colors_type")
 
 
 class FBX_PT_import_transform(bpy.types.Panel):
@@ -394,6 +386,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             description="Export selected and visible objects only",
             default=False,
             )
+    use_visible: BoolProperty(
+            name='Visible Objects',
+            description='Export visible objects only',
+            default=False
+            )
     use_active_collection: BoolProperty(
             name="Active Collection",
             description="Export only objects from the active collection (and its children)",
@@ -476,6 +473,15 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                         "(prefer 'Normals Only' option if your target importer understand split normals)",
             default='OFF',
             )
+    colors_type: EnumProperty(
+            name="Vertex Colors",
+            items=(('NONE', "None", "Do not export color attributes"),
+                   ('SRGB', "sRGB", "Export colors in sRGB color space"),
+                   ('LINEAR', "Linear", "Export colors in linear color space"),
+                   ),
+            description="Export vertex color attributes",
+            default='SRGB',
+            )
     use_subsurf: BoolProperty(
             name="Export Subdivision Surface",
             description="Export the last Catmull-Rom subdivision modifier as FBX subdivision "
@@ -491,6 +497,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             name="Tangent Space",
             description="Add binormal and tangent vectors, together with normal they form the tangent space "
                         "(will only work correctly with tris/quads only meshes!)",
+            default=False,
+            )
+    use_triangles: BoolProperty(
+            name="Triangulate Faces",
+            description="Convert all faces to triangles",
             default=False,
             )
     use_custom_props: BoolProperty(
@@ -701,6 +712,7 @@ class FBX_PT_export_include(bpy.types.Panel):
         sublayout = layout.column(heading="Limit to")
         sublayout.enabled = (operator.batch_mode == 'OFF')
         sublayout.prop(operator, "use_selection")
+        sublayout.prop(operator, "use_visible")
         sublayout.prop(operator, "use_active_collection")
 
         layout.column().prop(operator, "object_types")
@@ -770,9 +782,11 @@ class FBX_PT_export_geometry(bpy.types.Panel):
         #sub.enabled = operator.use_mesh_modifiers and False  # disabled in 2.8...
         #sub.prop(operator, "use_mesh_modifiers_render")
         layout.prop(operator, "use_mesh_edges")
+        layout.prop(operator, "use_triangles")
         sub = layout.row()
         #~ sub.enabled = operator.mesh_smooth_type in {'OFF'}
         sub.prop(operator, "use_tspace")
+        layout.prop(operator, "colors_type")
 
 
 class FBX_PT_export_armature(bpy.types.Panel):

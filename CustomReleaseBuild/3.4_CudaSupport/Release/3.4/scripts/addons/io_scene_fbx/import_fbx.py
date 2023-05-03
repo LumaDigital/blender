@@ -1,22 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Script copyright (C) Blender Foundation
 
@@ -33,6 +15,7 @@ if "bpy" in locals():
         importlib.reload(fbx_utils)
 
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from mathutils import Matrix, Euler, Vector
 
 # -----
@@ -565,7 +548,7 @@ def blen_read_animations_curves_iter(fbx_curves, blen_start_offset, fbx_start_of
         yield (curr_blenkframe, curr_values)
 
 
-def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
+def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset, global_scale):
     """
     'Bake' loc/rot/scale into the action,
     taking any pre_ and post_ matrix into account to transform from fbx into blender space.
@@ -599,7 +582,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
     elif isinstance(item, ShapeKey):
         props = [(item.path_from_id("value"), 1, "Key")]
     elif isinstance(item, Camera):
-        props = [(item.path_from_id("lens"), 1, "Camera")]
+        props = [(item.path_from_id("lens"), 1, "Camera"), (item.dof.path_from_id("focus_distance"), 1, "Camera")]
     else:  # Object or PoseBone:
         if item.is_bone:
             bl_obj = item.bl_obj.pose.bones[item.bl_bone]
@@ -607,7 +590,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
             bl_obj = item.bl_obj
 
         # We want to create actions for objects, but for bones we 'reuse' armatures' actions!
-        grpname = item.bl_obj.name
+        grpname = bl_obj.name
 
         # Since we might get other channels animated in the end, due to all FBX transform magic,
         # we need to add curves for whole loc/rot/scale in any case.
@@ -649,13 +632,17 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
 
     elif isinstance(item, Camera):
         for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
-            value = 0.0
+            focal_length = 0.0
+            focus_distance = 0.0
             for v, (fbxprop, channel, _fbx_acdata) in values:
-                assert(fbxprop == b'FocalLength')
+                assert(fbxprop == b'FocalLength' or fbxprop == b'FocusDistance' )
                 assert(channel == 0)
-                value = v
+                if (fbxprop == b'FocalLength' ):
+                    focal_length = v
+                elif(fbxprop == b'FocusDistance'):
+                    focus_distance = v / 1000 * global_scale
 
-            for fc, v in zip(blen_curves, (value,)):
+            for fc, v in zip(blen_curves, (focal_length, focus_distance)):
                 store_keyframe(fc, frame, v)
 
     else:  # Object or PoseBone:
@@ -731,7 +718,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
         fc.update()
 
 
-def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_offset):
+def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_offset, global_scale):
     """
     Recreate an action per stack/layer/object combinations.
     Only the first found action is linked to objects, more complex setups are not handled,
@@ -764,7 +751,10 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_o
                 key = (as_uuid, al_uuid, id_data)
                 action = actions.get(key)
                 if action is None:
-                    action_name = "|".join((id_data.name, stack_name, layer_name))
+                    if stack_name == layer_name:
+                        action_name = "|".join((id_data.name, stack_name))
+                    else:
+                        action_name = "|".join((id_data.name, stack_name, layer_name))
                     actions[key] = action = bpy.data.actions.new(action_name)
                     action.use_fake_user = True
                 # If none yet assigned, assign this action to id_data.
@@ -773,7 +763,7 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_o
                 if not id_data.animation_data.action:
                     id_data.animation_data.action = action
                 # And actually populate the action!
-                blen_read_animations_action_item(action, item, cnodes, scene.render.fps, anim_offset)
+                blen_read_animations_action_item(action, item, cnodes, scene.render.fps, anim_offset, global_scale)
 
 
 # ----
@@ -789,16 +779,22 @@ def blen_read_geom_layerinfo(fbx_layer):
 
 def blen_read_geom_array_setattr(generator, blen_data, blen_attr, fbx_data, stride, item_size, descr, xform):
     """Generic fbx_layer to blen_data setter, generator is expected to yield tuples (ble_idx, fbx_idx)."""
-    max_idx = len(blen_data) - 1
+    max_blen_idx = len(blen_data) - 1
+    max_fbx_idx = len(fbx_data) - 1
     print_error = True
 
     def check_skip(blen_idx, fbx_idx):
         nonlocal print_error
         if fbx_idx < 0:  # Negative values mean 'skip'.
             return True
-        if blen_idx > max_idx:
+        if blen_idx > max_blen_idx:
             if print_error:
-                print("ERROR: too much data in this layer, compared to elements in mesh, skipping!")
+                print("ERROR: too much data in this Blender layer, compared to elements in mesh, skipping!")
+                print_error = False
+            return True
+        if fbx_idx + item_size - 1 > max_fbx_idx:
+            if print_error:
+                print("ERROR: not enough data in this FBX layer, skipping!")
                 print_error = False
             return True
         return False
@@ -1066,7 +1062,12 @@ def blen_read_geom_layer_uv(fbx_obj, mesh):
                 )
 
 
-def blen_read_geom_layer_color(fbx_obj, mesh):
+def blen_read_geom_layer_color(fbx_obj, mesh, colors_type):
+    if colors_type == 'NONE':
+        return
+    use_srgb = colors_type == 'SRGB'
+    layer_type = 'BYTE_COLOR' if use_srgb else 'FLOAT_COLOR'
+    color_prop_name = "color_srgb" if use_srgb else "color"
     # almost same as UV's
     for layer_id in (b'LayerElementColor',):
         for fbx_layer in elem_find_iter(fbx_obj, layer_id):
@@ -1079,8 +1080,7 @@ def blen_read_geom_layer_color(fbx_obj, mesh):
             fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, b'Colors'))
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'ColorIndex'))
 
-            # Always init our new layers with full white opaque color.
-            color_lay = mesh.vertex_colors.new(name=fbx_layer_name, do_init=False)
+            color_lay = mesh.color_attributes.new(name=fbx_layer_name, type=layer_type, domain='CORNER')
 
             if color_lay is None:
                 print("Failed to add {%r %r} vertex color layer to %r (probably too many of them?)"
@@ -1095,7 +1095,7 @@ def blen_read_geom_layer_color(fbx_obj, mesh):
                 continue
 
             blen_read_geom_array_mapped_polyloop(
-                mesh, blen_data, "color",
+                mesh, blen_data, color_prop_name,
                 fbx_layer_data, fbx_layer_index,
                 fbx_layer_mapping, fbx_layer_ref,
                 4, 4, layer_id,
@@ -1122,7 +1122,7 @@ def blen_read_geom_layer_smooth(fbx_obj, mesh):
         return False
 
     if fbx_layer_mapping == b'ByEdge':
-        # some models have bad edge data, we cant use this info...
+        # some models have bad edge data, we can't use this info...
         if not mesh.edges:
             print("warning skipping sharp edges data, no valid edges...")
             return False
@@ -1171,13 +1171,13 @@ def blen_read_geom_layer_edge_crease(fbx_obj, mesh):
     layer_id = b'EdgeCrease'
     fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, layer_id))
 
-    # some models have bad edge data, we cant use this info...
+    # some models have bad edge data, we can't use this info...
     if not mesh.edges:
         print("warning skipping edge crease data, no valid edges...")
         return False
 
     if fbx_layer_mapping == b'ByEdge':
-        # some models have bad edge data, we cant use this info...
+        # some models have bad edge data, we can't use this info...
         if not mesh.edges:
             print("warning skipping edge crease data, no valid edges...")
             return False
@@ -1188,7 +1188,7 @@ def blen_read_geom_layer_edge_crease(fbx_obj, mesh):
             fbx_layer_data, None,
             fbx_layer_mapping, fbx_layer_ref,
             1, 1, layer_id,
-            # Blender squares those values before sending them to OpenSubdiv, when other softwares don't,
+            # Blender squares those values before sending them to OpenSubdiv, when other software don't,
             # so we need to compensate that to get similar results through FBX...
             xform=sqrt,
             )
@@ -1294,7 +1294,7 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
 
         blen_read_geom_layer_material(fbx_obj, mesh)
         blen_read_geom_layer_uv(fbx_obj, mesh)
-        blen_read_geom_layer_color(fbx_obj, mesh)
+        blen_read_geom_layer_color(fbx_obj, mesh, settings.colors_type)
 
     if fbx_edges:
         # edges in fact index the polygons (NOT the vertices)
@@ -1330,7 +1330,7 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
     # must be after edge, face loading.
     ok_smooth = blen_read_geom_layer_smooth(fbx_obj, mesh)
 
-    ok_crease = blen_read_geom_layer_edge_crease(fbx_obj, mesh)
+    blen_read_geom_layer_edge_crease(fbx_obj, mesh)
 
     ok_normals = False
     if settings.use_custom_normals:
@@ -1364,9 +1364,6 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
 
     if not ok_smooth:
         mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-
-    if ok_crease:
-        mesh.use_customdata_edge_crease = True
 
     if settings.use_custom_props:
         blen_read_custom_properties(fbx_obj, mesh, settings)
@@ -1440,9 +1437,9 @@ def blen_read_material(fbx_tmpl, fbx_obj, settings):
     # No specular color in Principled BSDF shader, assumed to be either white or take some tint from diffuse one...
     # TODO: add way to handle tint option (guesstimate from spec color + intensity...)?
     ma_wrap.specular = elem_props_get_number(fbx_props, b'SpecularFactor', 0.25) * 2.0
-    # XXX Totally empirical conversion, trying to adapt it
-    #     (from 1.0 - 0.0 Principled BSDF range to 0.0 - 100.0 FBX shininess range)...
-    fbx_shininess = elem_props_get_number(fbx_props, b'Shininess', 20.0)
+    # XXX Totally empirical conversion, trying to adapt it (and protect against invalid negative values, see T96076):
+    #     From [1.0 - 0.0] Principled BSDF range to [0.0 - 100.0] FBX shininess range)...
+    fbx_shininess = max(elem_props_get_number(fbx_props, b'Shininess', 20.0), 0.0)
     ma_wrap.roughness = 1.0 - (sqrt(fbx_shininess) / 10.0)
     # Sweetness... Looks like we are not the only ones to not know exactly how FBX is supposed to work (see T59850).
     # According to one of its developers, Unity uses that formula to extract alpha value:
@@ -1555,6 +1552,10 @@ def blen_read_camera(fbx_tmpl, fbx_obj, global_scale):
     camera = bpy.data.cameras.new(name=elem_name_utf8)
 
     camera.type = 'ORTHO' if elem_props_get_enum(fbx_props, b'CameraProjectionType', 0) == 1 else 'PERSP'
+
+    camera.dof.focus_distance = elem_props_get_number(fbx_props, b'FocusDistance', 10 * 1000) / 1000 * global_scale
+    if (elem_props_get_bool(fbx_props, b'UseDepthOfField', False)):
+        camera.dof.use_dof = True
 
     camera.lens = elem_props_get_number(fbx_props, b'FocalLength', 35.0)
     camera.sensor_width = elem_props_get_number(fbx_props, b'FilmWidth', 32.0 * M2I) / M2I
@@ -2366,7 +2367,8 @@ def load(operator, context, filepath="",
          automatic_bone_orientation=False,
          primary_bone_axis='Y',
          secondary_bone_axis='X',
-         use_prepost_rot=True):
+         use_prepost_rot=True,
+         colors_type='SRGB'):
 
     global fbx_elem_nil
     fbx_elem_nil = FBXElem('', (), (), ())
@@ -2400,7 +2402,7 @@ def load(operator, context, filepath="",
         is_ascii = False
 
     if is_ascii:
-        operator.report({'ERROR'}, "ASCII FBX files are not supported %r" % filepath)
+        operator.report({'ERROR'}, tip_("ASCII FBX files are not supported %r") % filepath)
         return {'CANCELLED'}
     del is_ascii
     # End ascii detection.
@@ -2411,11 +2413,11 @@ def load(operator, context, filepath="",
         import traceback
         traceback.print_exc()
 
-        operator.report({'ERROR'}, "Couldn't open file %r (%s)" % (filepath, e))
+        operator.report({'ERROR'}, tip_("Couldn't open file %r (%s)") % (filepath, e))
         return {'CANCELLED'}
 
     if version < 7100:
-        operator.report({'ERROR'}, "Version %r unsupported, must be %r or later" % (version, 7100))
+        operator.report({'ERROR'}, tip_("Version %r unsupported, must be %r or later") % (version, 7100))
         return {'CANCELLED'}
 
     print("FBX version: %r" % version)
@@ -2450,7 +2452,7 @@ def load(operator, context, filepath="",
     fbx_settings = elem_find_first(elem_root, b'GlobalSettings')
     fbx_settings_props = elem_find_first(fbx_settings, b'Properties70')
     if fbx_settings is None or fbx_settings_props is None:
-        operator.report({'ERROR'}, "No 'GlobalSettings' found in file %r" % filepath)
+        operator.report({'ERROR'}, tip_("No 'GlobalSettings' found in file %r") % filepath)
         return {'CANCELLED'}
 
     # FBX default base unit seems to be the centimeter, while raw Blender Unit is equivalent to the meter...
@@ -2505,7 +2507,7 @@ def load(operator, context, filepath="",
         use_custom_props, use_custom_props_enum_as_string,
         nodal_material_wrap_map, image_cache,
         ignore_leaf_bones, force_connect_children, automatic_bone_orientation, bone_correction_matrix,
-        use_prepost_rot,
+        use_prepost_rot, colors_type,
     )
 
     # #### And now, the "real" data.
@@ -2517,10 +2519,10 @@ def load(operator, context, filepath="",
     fbx_connections = elem_find_first(elem_root, b'Connections')
 
     if fbx_nodes is None:
-        operator.report({'ERROR'}, "No 'Objects' found in file %r" % filepath)
+        operator.report({'ERROR'}, tip_("No 'Objects' found in file %r") % filepath)
         return {'CANCELLED'}
     if fbx_connections is None:
-        operator.report({'ERROR'}, "No 'Connections' found in file %r" % filepath)
+        operator.report({'ERROR'}, tip_("No 'Connections' found in file %r") % filepath)
         return {'CANCELLED'}
 
     # ----
@@ -2671,7 +2673,7 @@ def load(operator, context, filepath="",
     def connection_filter_ex(fbx_uuid, fbx_id, dct):
         return [(c_found[0], c_found[1], c_type)
                 for (c_uuid, c_type) in dct.get(fbx_uuid, ())
-                # 0 is used for the root node, which isnt in fbx_table_nodes
+                # 0 is used for the root node, which isn't in fbx_table_nodes
                 for c_found in (() if c_uuid == 0 else (fbx_table_nodes.get(c_uuid, (None, None)),))
                 if (fbx_id is None) or (c_found[0] and c_found[0].id == fbx_id)]
 
@@ -2930,7 +2932,7 @@ def load(operator, context, filepath="",
                             mod.levels = preview_levels
                             mod.render_levels = render_levels
                             boundary_rule = elem_prop_first(elem_find_first(fbx_sdata, b'BoundaryRule'), default=1)
-                            if boundary_rule == 2:
+                            if boundary_rule == 1:
                                 mod.boundary_smooth = "PRESERVE_CORNERS"
                             else:
                                 mod.boundary_smooth = "ALL"
@@ -3002,6 +3004,13 @@ def load(operator, context, filepath="",
                             continue
                         cam = fbx_item[1]
                         items.append((cam, lnk_prop))
+                    elif lnk_prop == b'FocusDistance':  # Camera focus.
+                        from bpy.types import Camera
+                        fbx_item = fbx_table_nodes.get(n_uuid, None)
+                        if fbx_item is None or not isinstance(fbx_item[1], Camera):
+                            continue
+                        cam = fbx_item[1]
+                        items.append((cam, lnk_prop))
                     elif lnk_prop == b'DiffuseColor':
                         from bpy.types import Material
                         fbx_item = fbx_table_nodes.get(n_uuid, None)
@@ -3040,14 +3049,15 @@ def load(operator, context, filepath="",
                     channel = {
                         b'd|X': 0, b'd|Y': 1, b'd|Z': 2,
                         b'd|DeformPercent': 0,
-                        b'd|FocalLength': 0
+                        b'd|FocalLength': 0,
+                        b'd|FocusDistance': 0
                     }.get(acn_ctype.props[3], None)
                     if channel is None:
                         continue
                     curvenodes[acn_uuid][ac_uuid] = (fbx_acitem, channel)
 
             # And now that we have sorted all this, apply animations!
-            blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, settings.anim_offset)
+            blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, settings.anim_offset, global_scale)
 
         _(); del _
 

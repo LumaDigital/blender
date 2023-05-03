@@ -1,22 +1,4 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Script copyright (C) Campbell Barton, Bastien Montagne
 
@@ -130,21 +112,28 @@ RIGHT_HAND_AXES = {
 }
 
 
+# NOTE: Not fully in enum value order, since when exporting the first entry matching the framerate value is used
+# (e.g. better have NTSC fullframe than NTSC drop frame for 29.97 framerate).
 FBX_FRAMERATES = (
+    #(-1.0, 0),  # Default framerate.
     (-1.0, 14),  # Custom framerate.
     (120.0, 1),
     (100.0, 2),
     (60.0, 3),
     (50.0, 4),
     (48.0, 5),
-    (30.0, 6),  # BW NTSC.
-    (30.0 / 1.001, 9),  # Color NTSC.
+    (30.0, 6),  # BW NTSC, full frame.
+    (30.0, 7),  # Drop frame.
+    (30.0 / 1.001, 9),  # Color NTSC, full frame.
+    (30.0 / 1.001, 8),  # Color NTSC, drop frame.
     (25.0, 10),
     (24.0, 11),
+    #(1.0, 12),  # 1000 milli/s (use for date time?).
     (24.0 / 1.001, 13),
     (96.0, 15),
     (72.0, 16),
     (60.0 / 1.001, 17),
+    (120.0 / 1.001, 18),
 )
 
 
@@ -735,6 +724,7 @@ class AnimationCurveNodeWrapper:
         'LCL_SCALING': ("Lcl Scaling", "S", ("X", "Y", "Z")),
         'SHAPE_KEY': ("DeformPercent", "DeformPercent", ("DeformPercent",)),
         'CAMERA_FOCAL': ("FocalLength", "FocalLength", ("FocalLength",)),
+        'CAMERA_FOCUS_DISTANCE': ("FocusDistance", "FocusDistance", ("FocusDistance",)),
     }
 
     def __init__(self, elem_key, kind, force_keying, force_startend_keying, default_values=...):
@@ -1197,7 +1187,7 @@ class ObjectWrapper(metaclass=MetaObjectWrapper):
         if self.parent == arm_obj and self.bdata.parent_type == 'ARMATURE':
             return True
         for mod in self.bdata.modifiers:
-            if mod.type == 'ARMATURE' and mod.object in {arm_obj.bdata, arm_obj.bdata.proxy}:
+            if mod.type == 'ARMATURE' and mod.object == arm_obj.bdata:
                 return True
 
     # #### Duplis...
@@ -1225,12 +1215,12 @@ FBXExportSettings = namedtuple("FBXExportSettings", (
     "report", "to_axes", "global_matrix", "global_scale", "apply_unit_scale", "unit_scale",
     "bake_space_transform", "global_matrix_inv", "global_matrix_inv_transposed",
     "context_objects", "object_types", "use_mesh_modifiers", "use_mesh_modifiers_render",
-    "mesh_smooth_type", "use_subsurf", "use_mesh_edges", "use_tspace",
+    "mesh_smooth_type", "use_subsurf", "use_mesh_edges", "use_tspace", "use_triangles",
     "armature_nodetype", "use_armature_deform_only", "add_leaf_bones",
     "bone_correction_matrix", "bone_correction_matrix_inv",
     "bake_anim", "bake_anim_use_all_bones", "bake_anim_use_nla_strips", "bake_anim_use_all_actions",
     "bake_anim_step", "bake_anim_simplify_factor", "bake_anim_force_startend_keying",
-    "use_metadata", "media_settings", "use_custom_props",
+    "use_metadata", "media_settings", "use_custom_props", "colors_type",
 ))
 
 # Helper container gathering some data we need multiple times:
@@ -1259,5 +1249,5 @@ FBXImportSettings = namedtuple("FBXImportSettings", (
     "use_custom_props", "use_custom_props_enum_as_string",
     "nodal_material_wrap_map", "image_cache",
     "ignore_leaf_bones", "force_connect_children", "automatic_bone_orientation", "bone_correction_matrix",
-    "use_prepost_rot",
+    "use_prepost_rot", "colors_type",
 ))
