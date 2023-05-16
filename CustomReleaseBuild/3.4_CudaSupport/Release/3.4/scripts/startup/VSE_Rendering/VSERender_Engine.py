@@ -218,9 +218,9 @@ class Rendering_Engine():
         
         print("\n=====================================================================================")
         print("\nMake Vision Video tool initialized:")
-        
-        # TODO: Change name based on cutscene name
-        vv_file_name = os.path.join(self._vision_video_output_path, "Cutscene.vv")
+
+        blend_file_name = os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+        vv_file_name = os.path.join(self._vision_video_output_path, blend_file_name + ".vv")
         print("Output: " + vv_file_name)
         
         process = subprocess.Popen(
